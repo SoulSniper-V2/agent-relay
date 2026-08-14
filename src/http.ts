@@ -79,6 +79,15 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
         return;
       }
 
+      if (p === "/mcp" || p.startsWith("/mcp/")) {
+        send(res, 501, {
+          error:
+            "Streamable HTTP MCP is not implemented. Use stdio: npx tsx src/mcp.ts with RELAY_URL and RELAY_TOKEN (dashboard-minted PAT).",
+          transport: "stdio",
+        });
+        return;
+      }
+
       if (method === "POST" && p === "/v1/auth/request") {
         const b = await jsonBody(req);
         const issued = store.createLoginCode(String(b.email ?? ""));

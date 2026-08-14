@@ -29,6 +29,27 @@
 - Cursor header vs Claude `authorization_token`: https://github.com/github/github-mcp-server/issues/647
 - GitHub OAuth device flow (out-of-band user confirm): https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow
 
+## MCP vs A2A (layering, not a bake-off)
+
+- Redis: MCP is agent→tool (passive server); A2A is agent→agent across an ownership boundary. Use A2A when you do not control the other runtime. https://redis.io/blog/mcp-vs-a2a-which-protocol-do-you-need/
+- Same layering: KodeKloud 2026, Tyk, AAIF (MCP + A2A under Linux Foundation). IBM ACP merged into A2A (2025).
+- Coding agents (Cursor, Claude Code, Codex) already speak **MCP stdio / CLI**. They do **not** currently expose an A2A Agent Card as the default way a friend's agent reaches them.
+- Implication for this repo: a **hub + MCP/CLI tools** is how those agents actually join today. An A2A adapter (Agent Card pointing at the same mailbox) is a later interoperability layer, not the first product. Building “an MCP server whose only job is to be A2A” would be the wrong layer (KodeKloud: if you are coordinating other agents, that is A2A’s job — here the *peers* are still MCP clients of a shared mailbox, because that is what the harnesses are).
+
+## Closest products (checked Aug 2026)
+
+### OpenAgents Workspace (closest)
+
+- Docs: https://openagents.org/docs/en/workspace/what-is-workspace
+- Cross-user **does exist**: share a workspace token; teammate `agn workspace join`; both agent pools appear in one Slack-like hub (channels, DMs, @mentions, shared files/browser).
+- Protocol: OpenAgents Network Model (ONM) + their **Launcher** (`agn`). MCP/A2A are mentioned for self-hosted networks, not as the default Cursor/Claude install.
+- Difference we still occupy: **no custom daemon**. Identity is **people** (email OTP) not a workspace token. **Grants** (visitor/pair/cofounder) are first-class. **GitHub remains the repo** — we do not share a disk or browser. Install is `SKILL.md` + `relay` CLI / stdio MCP.
+
+### Others
+
+- Local multi-agent MCP / “Agent Teams” (Claude Code): same-user JSON mailboxes + poll, not cross-account identity.
+- Ledgenter-class same-user state: not two humans.
+
 ## Product implication
 
-Agent-native email OTP + dashboard-minted PATs matches how humans already wire GitHub MCP. Full MCP OAuth 2.1 is the right *next* step for a hosted HTTP `/mcp` URL so Cursor can do a browser login without pasting secrets into chat. Do not collect long-lived tokens via the model if the dashboard can mint them instead (SEP-1036).
+Agent-native email OTP + dashboard-minted PATs matches how humans already wire GitHub MCP. Full MCP OAuth 2.1 is the right *next* step for a hosted HTTP `/mcp` URL so Cursor can do a browser login without pasting secrets into chat. Do not collect long-lived tokens via the model if the dashboard can mint them instead (SEP-1036). Until Streamable HTTP MCP exists, the dashboard must only emit **stdio** snippets (tested: `GET /mcp` returns 501).

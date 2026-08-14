@@ -41,7 +41,7 @@ export function dashboardHtml(hub: string): string {
     <h2>Agent token</h2>
     <p>Give this to MCP or the CLI. Shown once. GitHub’s MCP does the same with a PAT in <code>Authorization: Bearer</code> or <code>GITHUB_PERSONAL_ACCESS_TOKEN</code>.</p>
     <pre id="tokenbox"></pre>
-    <p>MCP snippet (Cursor / Claude Code remote-style headers):</p>
+    <p>MCP snippet (stdio + PAT — same pattern as GitHub MCP. There is no HTTP <code>/mcp</code> yet.):</p>
     <pre id="mcpbox"></pre>
     <h2>Mint another token</h2>
     <input id="tname" placeholder="laptop, cloud-agent, …">
@@ -71,6 +71,17 @@ $("send").onclick = async () => {
     msg(r.hint || "Code sent. Check email (or the hub mailbox folder in local mode).", true);
   } catch (e) { msg(e.message); }
 };
+function mcpSnippet(pat) {
+  return JSON.stringify({
+    mcpServers: {
+      "agent-relay": {
+        command: "npx",
+        args: ["tsx", "src/mcp.ts"],
+        env: { RELAY_URL: hub || location.origin, RELAY_TOKEN: pat || "paste-arl-token" }
+      }
+    }
+  }, null, 2);
+}
 async function showApp(token, extra) {
   localStorage.setItem(tokenKey, token);
   $("login").hidden = true;
@@ -79,25 +90,10 @@ async function showApp(token, extra) {
   $("who").textContent = "Signed in as @" + me.me.handle + (me.me.email ? " · " + me.me.email : "");
   if (extra?.token) {
     $("tokenbox").textContent = extra.token;
-    $("mcpbox").textContent = JSON.stringify({
-      mcpServers: {
-        "agent-relay": {
-          command: "npx",
-          args: ["tsx", "src/mcp.ts"],
-          env: { RELAY_URL: hub || location.origin, RELAY_TOKEN: extra.token }
-        }
-      }
-    }, null, 2);
+    $("mcpbox").textContent = mcpSnippet(extra.token);
   } else {
     $("tokenbox").textContent = "(already saved in this browser. Mint a new token to copy a fresh secret.)";
-    $("mcpbox").textContent = JSON.stringify({
-      mcpServers: {
-        "agent-relay": {
-          url: (hub || location.origin) + "/mcp",
-          headers: { Authorization: "Bearer <paste token from mint>" }
-        }
-      }
-    }, null, 2);
+    $("mcpbox").textContent = mcpSnippet("");
   }
   const p = await api("GET", "/v1/people", undefined, token);
   $("people").textContent = JSON.stringify(p.people, null, 2);
@@ -113,6 +109,7 @@ $("mint").onclick = async () => {
     const token = localStorage.getItem(tokenKey);
     const r = await api("POST", "/v1/tokens", { name: $("tname").value || "dashboard" }, token);
     $("tokenbox").textContent = r.token;
+    $("mcpbox").textContent = mcpSnippet(r.token);
     msg("New token created. Copy it now.", true);
   } catch (e) { msg(e.message); }
 };

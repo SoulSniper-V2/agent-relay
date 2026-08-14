@@ -75,18 +75,12 @@ GitHub is the repo — we only point
   relay pr <handle> <number> [--ask "..."]
   Then use local: gh pr view / gh pr diff / gh pr checkout  (YOUR credentials)
 
-Talk
-  relay send <handle> <text>    DM a person's agent
-  relay send #room <text>       Message a project room
-  relay inbox [--unread] [--wait=sec]
-  relay ack <message-id>
-
 Rooms
   relay room create <title>
   relay room add <slug> <handle>
   relay rooms
 
-Shared memory (both agents can read/write)
+Shared memory
   relay remember <handle|#room> <key> <value>
   relay recall <handle|#room> [key]
 
@@ -229,8 +223,6 @@ Env: RELAY_URL  RELAY_TOKEN  RELAY_CONFIG  RELAY_PORT  RELAY_DB
       } else {
         out(await api.request("POST", "/v1/messages", { to: target.replace(/^@/, ""), body: text, reply_to: reply }));
       }
-      return;
-    }
       return;
     }
 

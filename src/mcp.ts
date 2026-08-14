@@ -4,6 +4,7 @@
  * can call tools instead of shelling out. Auth via RELAY_TOKEN + RELAY_URL
  * or ~/.agent-relay/config.json.
  */
+import { writeSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { RelayClient } from "./client.ts";
 import { loadConfig } from "./config.ts";
@@ -342,11 +343,11 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<un
 }
 
 function respond(id: number | string | undefined, result: unknown) {
-  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, result }) + "\n");
+  writeSync(1, JSON.stringify({ jsonrpc: "2.0", id, result }) + "\n");
 }
 
 function respondError(id: number | string | undefined, message: string) {
-  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32000, message } }) + "\n");
+  writeSync(1, JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32000, message } }) + "\n");
 }
 
 const rl = createInterface({ input: process.stdin });

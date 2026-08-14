@@ -10,7 +10,9 @@
     "relay": "node --experimental-sqlite --import tsx src/cli.ts",
     "serve": "node --experimental-sqlite --import tsx src/serve.ts",
     "mcp": "node --import tsx src/mcp.ts",
-    "test": "node --experimental-sqlite --import tsx --test test/*.test.ts",
+    "test": "node --experimental-sqlite --import tsx --test test/*.test.ts && bash scripts/e2e-cli.sh",
+    "test:unit": "node --experimental-sqlite --import tsx --test test/*.test.ts",
+    "test:cli": "bash scripts/e2e-cli.sh",
     "build": "tsc"
   },
   "dependencies": {

@@ -7,7 +7,7 @@ Coding agents do **not** hold a WebSocket to each other. They run a turn: read t
 3. A **ping** so the other agent’s next turn notices work
 4. Instructions in a file the harness already loads
 
-That is why this repo ships `AGENTS.md` (AAIF / agents.md) plus thin adapters — not a custom launcher like OpenAgents’ `agn`.
+That is why this repo ships `AGENTS.md` (AAIF / agents.md) plus thin adapters — not a custom launcher like OpenAgents’ `agn`. OpenAgents Workspace *does* support two humans sharing a workspace token; we still differ by staying MCP/CLI/skill-native, person identity, grants, and GitHub as the code store. See [docs/RESEARCH.md](RESEARCH.md).
 
 ## Harness map (2026)
 

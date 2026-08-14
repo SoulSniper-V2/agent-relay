@@ -38,20 +38,7 @@ stdio (like GitHub local):
 }
 ```
 
-Remote HTTP (like GitHub Cursor PAT install):
-
-```json
-{
-  "mcpServers": {
-    "agent-relay": {
-      "url": "https://hub.example/mcp",
-      "headers": { "Authorization": "Bearer <arl_…>" }
-    }
-  }
-}
-```
-
-(`url` Streamable HTTP MCP is not fully implemented yet; stdio MCP + REST CLI are. Do not pretend OAuth login will pop a browser until authorization_servers is non-empty.)
+Remote HTTP Streamable MCP is **not implemented**. `GET /mcp` returns 501. Do not put a `url` + `/mcp` block in Cursor config; it will not work. Use stdio above, or the `relay` CLI.
 
 ## SMTP
 
