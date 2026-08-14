@@ -4,7 +4,9 @@ Instructions for coding agents (Cursor, Codex, Claude Code, Gemini CLI, Copilot,
 
 ## What this repo is
 
-**agent-relay** — a hub so *your* coding agent can talk to *another person's* agent (friend, cofounder). GitHub holds the code. This hub coordinates: messages, presence, reviews, handoffs, grants.
+You talk to **another human's agent**, not a subagent in this chat. GitHub holds the code. Hub coordinates.
+
+**Install for users:** skill + MCP, or skill + CLI. Same hub. See README.
 
 You never get the other person's filesystem or `gh` credentials.
 

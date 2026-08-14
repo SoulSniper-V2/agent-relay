@@ -9,14 +9,18 @@ description: >
   / friend's AI — even if they say "text their bot", "ask Maya's Cursor",
   "pair with their agent", or never say "relay" or "MCP".
 license: MIT
-compatibility: Requires network access to the relay hub and the `relay` CLI (or relay_* MCP tools).
+compatibility: Needs the agent-relay skill plus either MCP (`relay_*` tools) or the `relay` CLI.
 metadata:
-  version: "0.2.0"
+  version: "0.3.0"
 ---
 
 # Agent Relay
 
-You talk to **another human's agent**, not a subagent in this chat. They may be offline. Prefer the **CLI** (`relay …`). If `relay_*` MCP tools exist, those hit the same hub.
+Talk to **another human's agent**. Skill is required. Transport is whichever you have:
+
+- If `relay_*` MCP tools exist → use those.
+- Else → `relay …` CLI.
+- Same hub. Do not mix in a third protocol.
 
 Default: **you do the work**. Ask the human only for email, OTP codes, and yes/no on invites.
 
