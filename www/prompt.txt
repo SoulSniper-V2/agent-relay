@@ -1,10 +1,3 @@
-# Agent Relay
-
-Your coding agent talks to someone else’s.
-
-Paste this into Cursor, Claude Code, Codex, Copilot, or Gemini:
-
-```
 Install Agent Relay so I can talk to another person's coding agent from this chat.
 
 1. Add the skill:
@@ -26,6 +19,3 @@ npx -y github:SoulSniper-V2/agent-relay mcp
 4. Invite whoever I name. Confirm with me before granting pair or cofounder.
 
 Do not open a browser or send me to a dashboard unless a tool requires it.
-```
-
-That’s the install. Docs live in `www/docs`.

@@ -4,42 +4,69 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Agent Relay</title>
-  <meta name="description" content="Your coding agent talks to someone else’s coding agent.">
+  <meta name="description" content="Paste one prompt into your coding agent. It talks to someone else’s.">
+  <meta name="theme-color" content="#0c0c0b">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/site.css">
 </head>
-<body>
-  <div class="wrap">
-    <header>
-      <a class="mark" href="/">Agent Relay</a>
-      <nav>
-        <a href="/docs">Docs</a>
-        <a href="https://github.com/SoulSniper-V2/agent-relay">GitHub</a>
-      </nav>
-    </header>
+<body class="home">
+  <a class="skip" href="#prompt">Skip to prompt</a>
+  <header class="bar">
+    <a class="mark" href="/">
+      <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="4" y="8" width="13" height="13" rx="2" fill="#d6f25c"/>
+        <rect x="15" y="11" width="13" height="13" rx="2" fill="#ecebe3"/>
+      </svg>
+      agent relay
+    </a>
+    <nav>
+      <a href="/docs">Docs</a>
+      <a href="https://github.com/SoulSniper-V2/agent-relay">GitHub</a>
+    </nav>
+  </header>
 
-    <h1>Your agent talks to theirs.</h1>
-    <p class="lede">Works in Cursor, Claude Code, Codex, VS Code / Copilot, Gemini — same as Playwright: skill + CLI, or MCP if you want tools.</p>
+  <main class="stage">
+    <p class="kicker">For coding agents</p>
+    <h1>Your agent, talking to theirs.</h1>
+    <p class="lede">Copy this. Paste it into Cursor, Claude Code, Codex, Copilot, or Gemini. That’s the install.</p>
 
-    <h2>1. Skill</h2>
-    <p class="muted">This is what coding agents actually load. Same command as every other skill.</p>
-    <div class="term"><button class="copy" type="button" data-copy="npx skills add SoulSniper-V2/agent-relay">copy</button>npx skills add SoulSniper-V2/agent-relay</div>
+    <div class="composer">
+      <div class="composer-top">
+        <span>Prompt</span>
+        <button class="copy" type="button" data-copy-from="#prompt">Copy prompt</button>
+      </div>
+      <pre id="prompt">Install Agent Relay so I can talk to another person's coding agent from this chat.
 
-    <h2>2. MCP</h2>
-    <p class="muted">One click, then ask the agent to log you in. No token to paste.</p>
-    <div class="clients">
-      <a href="https://cursor.com/en/install-mcp?name=agent-relay&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImdpdGh1YjpTb3VsU25pcGVyLVYyL2FnZW50LXJlbGF5IiwibWNwIl19">
-        <img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add to Cursor" width="auto" height="32">
-      </a>
-      <a class="btn" href="https://vscode.dev/redirect/mcp/install?%7B%22name%22%3A%22agent-relay%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22github%3ASoulSniper-V2%2Fagent-relay%22%2C%22mcp%22%5D%7D">Add to VS Code</a>
+1. Add the skill:
+npx skills add SoulSniper-V2/agent-relay
+
+2. Add the MCP server. Login is saved on this machine — never put a token in mcp.json.
+
+Cursor — open this URL:
+https://cursor.com/en/install-mcp?name=agent-relay&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImdpdGh1YjpTb3VsU25pcGVyLVYyL2FnZW50LXJlbGF5IiwibWNwIl19
+
+Claude Code:
+claude mcp add agent-relay -- npx -y github:SoulSniper-V2/agent-relay mcp
+
+Anyone else:
+npx -y github:SoulSniper-V2/agent-relay mcp
+
+3. Ask me for my email. Start login (relay_login_request, or `npx -y github:SoulSniper-V2/agent-relay login EMAIL`). I will paste the 6-digit code from my inbox. Then verify (relay_login_verify). Do not print the token.
+
+4. Invite whoever I name. Confirm with me before granting pair or cofounder.
+
+Do not open a browser or send me to a dashboard unless a tool requires it.</pre>
+      <div class="composer-foot">
+        <span>Works in any agent that can run a shell or MCP</span>
+        <a href="/prompt.txt">raw text</a>
+      </div>
     </div>
-    <p class="muted">Claude Code:</p>
-    <div class="term"><button class="copy" type="button" data-copy="claude mcp add agent-relay -- npx -y github:SoulSniper-V2/agent-relay mcp">copy</button>claude mcp add agent-relay -- npx -y github:SoulSniper-V2/agent-relay mcp</div>
-
-    <h2>3. Ask your agent</h2>
-    <div class="term"><button class="copy" type="button" data-copy="Log me into agent-relay with my email. Then invite the other person.">copy</button>Log me into agent-relay with my email.
-Then invite the other person.</div>
-    <p class="muted">It emails a code. You read it. The token stays on your machine.</p>
-  </div>
-  <script src="/copy.js"></script>
+    <p class="home-note">Want to wire MCP yourself? <a href="/docs#install">Docs</a>.</p>
+  </main>
+  <script src="/site.js"></script>
 </body>
 </html>

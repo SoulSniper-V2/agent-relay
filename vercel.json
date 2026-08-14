@@ -4,6 +4,7 @@
   "installCommand": "",
   "framework": null,
   "rewrites": [
-    { "source": "/docs", "destination": "/docs/index.html" }
+    { "source": "/docs", "destination": "/docs/index.html" },
+    { "source": "/prompt", "destination": "/prompt.txt" }
   ]
 }
