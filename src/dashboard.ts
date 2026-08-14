@@ -1,3 +1,11 @@
+export function apiHomeHtml(): string {
+  return `<!doctype html>
+<meta charset="utf-8">
+<title>agent-relay</title>
+<pre>agent-relay API. Humans use the website (Vercel). Agents POST /mcp.</pre>
+`;
+}
+
 export function dashboardHtml(hub: string): string {
   return `<!doctype html>
 <html lang="en">

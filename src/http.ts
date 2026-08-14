@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { RelayError, Store, type User } from "./store.ts";
-import { dashboardHtml } from "./dashboard.ts";
+import { apiHomeHtml, dashboardHtml } from "./dashboard.ts";
 import { sendMail } from "./email.ts";
 import type { RelayBus } from "./bus.ts";
 import { dispatchMcp, type Rpc } from "./mcp-core.ts";
@@ -58,7 +58,13 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
       const p = url.pathname.replace(/\/$/, "") || "/";
       const method = req.method ?? "GET";
 
-      if (method === "GET" && (p === "/" || p === "/app")) {
+      if (method === "GET" && p === "/") {
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(apiHomeHtml());
+        return;
+      }
+
+      if (method === "GET" && p === "/app") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(dashboardHtml(publicUrl));
         return;

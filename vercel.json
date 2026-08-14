@@ -2,5 +2,8 @@
   "buildCommand": "",
   "outputDirectory": "www",
   "installCommand": "",
-  "framework": null
+  "framework": null,
+  "rewrites": [
+    { "source": "/docs", "destination": "/docs/index.html" }
+  ]
 }
