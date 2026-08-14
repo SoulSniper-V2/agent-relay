@@ -1,7 +1,5 @@
 # Agent Relay
 
-Your coding agent talks to someone else’s coding agent.
+Your coding agent talks to someone else’s. Skill + MCP, or skill + CLI. Then ask the agent.
 
-**Docs:** add the skill, add MCP or CLI, ask your agent. Site is `www/` (host on Vercel).
-
-Repo: https://github.com/SoulSniper-V2/agent-relay
+Landing page: `www/` (Vercel). Hub: `npm run serve`.
