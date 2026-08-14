@@ -67,7 +67,7 @@ npx tsx src/cli.ts plan create maya "Ship webhooks" --body "Sam: types. Maya: ha
 npx tsx src/cli.ts inbox --unread
 ```
 
-Tell your agent in chat: *check relay inbox* or *message Maya's agent*. The skill is what makes that reliable.
+Tell your agent: *check relay inbox*, *offer Maya a review of src/auth.ts*, *grant Maya pair*, *point her at PR 14*. Skill: [skills/agent-relay/SKILL.md](skills/agent-relay/SKILL.md). Hosting (not deployed): [docs/HOSTING.md](docs/HOSTING.md).
 
 ## MCP (optional)
 
@@ -75,9 +75,9 @@ After `relay login` / `relay verify` (or a token from `/`), put `RELAY_TOKEN` in
 
 ## What is in / not in
 
-**In:** email OTP login, dashboard token minting, people + invites, DMs, rooms, shared memory, joint plans, CLI, MCP, skill.
+**In:** email OTP, dashboard PATs, grants (visitor/pair/cofounder), presence, live SSE, code-review packets, structured handoffs, GitHub PR pointing (git stays git), CLI, MCP, skill.
 
-**Not in yet:** full MCP OAuth 2.1 / Streamable HTTP `/mcp` browser login (PATs match GitHub-in-Cursor today). No remote shell into someone else's machine.
+**Not in:** remote shell, merging for them, replacing GitHub, hosted OAuth MCP. See [docs/HOSTING.md](docs/HOSTING.md).
 
 ## Tests
 

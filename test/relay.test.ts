@@ -134,3 +134,47 @@ test("strangers cannot DM until they accept an invite", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("grants: review and handoff are denied until the other person allows them", () => {
+  const { dir, db } = tmpDb();
+  try {
+    const store = new Store(openDb(db));
+    const alice = store.register("alice");
+    const bob = store.register("bob");
+    store.acceptInvite(bob.user, store.createInvite(alice.user).code);
+
+    store.setGrants(alice.user, "bob", { level: "visitor" });
+    assert.throws(
+      () => store.offerReview(bob.user, "alice", { path: "a.ts", body: "export const a = 1" }),
+      /review/,
+    );
+
+    store.setGrants(alice.user, "bob", { level: "pair" });
+    const rev = store.offerReview(bob.user, "alice", {
+      path: "src/a.ts",
+      body: "export const a = 1\n",
+      ask: "safe?",
+    });
+    const shown = store.getReview(alice.user, rev.id);
+    assert.match(shown.body ?? "", /export const a/);
+    const done = store.verdictReview(alice.user, rev.id, "lgtm", "ok");
+    assert.equal(done.verdict, "lgtm");
+
+    assert.throws(
+      () => store.offerHandoff(bob.user, "alice", { title: "ship it" }),
+      /handoff/,
+    );
+    store.setGrants(alice.user, "bob", { level: "cofounder" });
+    const hd = store.offerHandoff(bob.user, "alice", {
+      title: "Implement webhooks",
+      branch: "feat/hooks",
+      pr: "12",
+      acceptance: "tests pass",
+    });
+    const taken = store.updateHandoff(alice.user, hd.id, { status: "accepted" });
+    assert.equal(taken.status, "accepted");
+    store.pointPr(bob.user, "alice", "12", "look at auth");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

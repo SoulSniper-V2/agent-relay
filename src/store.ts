@@ -10,6 +10,8 @@ import {
   roomScope,
   token,
 } from "./ids.ts";
+import { DEFAULT_CAPS, LEVELS, capsCsv, parseCaps, type Cap } from "./caps.ts";
+import type { RelayEvent } from "./bus.ts";
 import { normalizeEmail } from "./email.ts";
 
 export type User = {
@@ -41,7 +43,14 @@ export class RelayError extends Error {
 }
 
 export class Store {
-  constructor(private db: DatabaseSync) {}
+  constructor(
+    private db: DatabaseSync,
+    private emit?: (userIds: string[], ev: RelayEvent) => void,
+  ) {}
+
+  private notify(userIds: string[], ev: Omit<RelayEvent, "at">) {
+    this.emit?.(userIds, { ...ev, at: now() });
+  }
 
   register(handle: string, name?: string): { user: User; token: string } {
     const h = normalizeHandle(handle);
@@ -242,6 +251,87 @@ export class Store {
     const t = now();
     this.db.prepare("INSERT OR IGNORE INTO contacts (user_a, user_b, created_at) VALUES (?, ?, ?)").run(a, b, t);
     this.db.prepare("INSERT OR IGNORE INTO contacts (user_a, user_b, created_at) VALUES (?, ?, ?)").run(b, a, t);
+    const caps = capsCsv(DEFAULT_CAPS);
+    this.db
+      .prepare(
+        "INSERT OR IGNORE INTO grants (owner_id, peer_id, caps, updated_at) VALUES (?, ?, ?, ?)",
+      )
+      .run(a, b, caps, t);
+    this.db
+      .prepare(
+        "INSERT OR IGNORE INTO grants (owner_id, peer_id, caps, updated_at) VALUES (?, ?, ?, ?)",
+      )
+      .run(b, a, caps, t);
+  }
+
+  grantsBetween(ownerId: string, peerId: string): Cap[] {
+    const row = this.db
+      .prepare("SELECT caps FROM grants WHERE owner_id = ? AND peer_id = ?")
+      .get(ownerId, peerId) as { caps: string } | undefined;
+    return parseCaps(row?.caps, []);
+  }
+
+  /** Target (other) has allowed actor (me) to use `cap` on them. */
+  requireAllowed(me: User, other: User, cap: Cap) {
+    this.requireContact(me, other);
+    const caps = this.grantsBetween(other.id, me.id);
+    if (!caps.includes(cap)) {
+      throw new RelayError(
+        403,
+        `@${other.handle} has not granted you '${cap}'. They run: relay grant @${me.handle} ${cap}   (or --level pair|cofounder)`,
+      );
+    }
+  }
+
+  setGrants(me: User, handle: string, spec: { caps?: string | string[]; level?: string }) {
+    const other = this.getUserByHandle(handle);
+    if (!other) throw new RelayError(404, `No user @${handle}.`);
+    this.requireContact(me, other);
+    let caps: Cap[];
+    if (spec.level) {
+      const level = spec.level.trim().toLowerCase();
+      const preset = LEVELS[level];
+      if (!preset) throw new RelayError(400, `Unknown level ${level}. Use visitor, pair, or cofounder.`);
+      caps = preset;
+    } else {
+      caps = parseCaps(spec.caps, []);
+      if (!caps.length) throw new RelayError(400, `Caps: ${Object.keys(LEVELS).join(", ")} or ${DEFAULT_CAPS.join(",")}`);
+    }
+    this.db
+      .prepare(
+        `INSERT INTO grants (owner_id, peer_id, caps, updated_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(owner_id, peer_id) DO UPDATE SET caps = excluded.caps, updated_at = excluded.updated_at`,
+      )
+      .run(me.id, other.id, capsCsv(caps), now());
+    this.systemMessage(
+      me.id,
+      other.id,
+      `@${me.handle} updated grants for @${other.handle}: ${caps.join(", ")}`,
+    );
+    this.notify([me.id, other.id], { type: "grants", from: me.handle, to: other.handle, caps });
+    return { owner: me.handle, peer: other.handle, caps, meaning: `You allowed @${other.handle}'s agent: ${caps.join(", ")}` };
+  }
+
+  setStatus(me: User, status: string, detail = "") {
+    const s = status.trim().slice(0, 40) || "idle";
+    const cardDetail = detail.trim();
+    this.db.prepare("UPDATE users SET status = ?, last_seen = ? WHERE id = ?").run(
+      cardDetail ? `${s}: ${cardDetail}`.slice(0, 120) : s,
+      now(),
+      me.id,
+    );
+    const people = this.people(me);
+    this.notify(
+      [me.id, ...people.map((p) => this.getUserByHandle(p.handle)?.id).filter(Boolean) as string[]],
+      { type: "presence", handle: me.handle, status: s, detail: cardDetail },
+    );
+    return { handle: me.handle, status: s, detail: cardDetail };
+  }
+
+  setCard(me: User, card: string) {
+    const c = card.trim().slice(0, 500);
+    this.db.prepare("UPDATE users SET card = ? WHERE id = ?").run(c, me.id);
+    return { handle: me.handle, card: c };
   }
 
   requireContact(me: User, other: User) {
@@ -259,13 +349,24 @@ export class Store {
   people(me: User) {
     const rows = this.db
       .prepare(
-        `SELECT u.id, u.handle, u.name, u.last_seen, u.created_at
+        `SELECT u.id, u.handle, u.name, u.last_seen, u.created_at, u.status, u.card
          FROM contacts c JOIN users u ON u.id = c.user_b
          WHERE c.user_a = ?
          ORDER BY u.handle`,
       )
       .all(me.id) as Record<string, unknown>[];
-    return rows.map(rowUser);
+    return rows.map((r) => {
+      const u = rowUser(r);
+      const online = u.last_seen != null && now() - u.last_seen < 120_000;
+      return {
+        ...u,
+        status: r.status ? String(r.status) : "offline",
+        card: r.card ? String(r.card) : "",
+        online,
+        they_allow_you: this.grantsBetween(u.id, me.id),
+        you_allow_them: this.grantsBetween(me.id, u.id),
+      };
+    });
   }
 
   createRoom(me: User, title: string, memberHandles: string[] = []) {
@@ -326,6 +427,7 @@ export class Store {
       slug: String(r.slug),
       title: String(r.title),
       created_by: String(r.created_by),
+      github_repo: r.github_repo ? String(r.github_repo) : null,
       members: members.map((m) => m.handle),
     };
   }
@@ -344,6 +446,7 @@ export class Store {
     const other = this.getUserByHandle(handle);
     if (!other) throw new RelayError(404, `No user @${normalizeHandle(handle)} on this hub.`);
     this.requireContact(me, other);
+    if (kind !== "system") this.requireAllowed(me, other, "message");
     return this.insertMessage(me.id, other.id, null, body, kind);
   }
 
@@ -380,7 +483,17 @@ export class Store {
         "INSERT INTO messages (id, from_user, to_user, room_id, kind, body, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
       )
       .run(msg.id, msg.from_user, msg.to_user, msg.room_id, msg.kind, msg.body, msg.created_at);
-    return this.hydrateMessage(msg as unknown as Record<string, unknown>, fromUser);
+    const hydrated = this.hydrateMessage(msg as unknown as Record<string, unknown>, fromUser);
+    const targets = [fromUser];
+    if (toUser) targets.push(toUser);
+    if (roomId) {
+      const members = this.db.prepare("SELECT user_id FROM room_members WHERE room_id = ?").all(roomId) as {
+        user_id: string;
+      }[];
+      targets.push(...members.map((m) => m.user_id));
+    }
+    this.notify(targets, { type: "message", message: hydrated });
+    return hydrated;
   }
 
   inbox(me: User, opts: { unread?: boolean; after?: number; limit?: number } = {}) {
@@ -446,6 +559,9 @@ export class Store {
   }
 
   remember(me: User, target: string, key: string, value: string) {
+    const t = target.trim().replace(/^@/, "");
+    const other = this.getUserByHandle(t);
+    if (other) this.requireAllowed(me, other, "memory");
     const scope = this.resolveScope(me, target);
     const k = key.trim();
     if (!k) throw new RelayError(400, "Memory key is required.");
@@ -454,11 +570,11 @@ export class Store {
     const existing = this.db.prepare("SELECT id FROM memory WHERE scope = ? AND key = ?").get(scope, k) as
       | { id: string }
       | undefined;
-    const t = now();
+    const ts = now();
     if (existing) {
       this.db
         .prepare("UPDATE memory SET value = ?, updated_by = ?, updated_at = ? WHERE id = ?")
-        .run(v, me.id, t, existing.id);
+        .run(v, me.id, ts, existing.id);
       return { id: existing.id, key: k, value: v, scope: target };
     }
     const mid = id("mem");
@@ -466,7 +582,7 @@ export class Store {
       .prepare(
         "INSERT INTO memory (id, scope, key, value, updated_by, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
       )
-      .run(mid, scope, k, v, me.id, t);
+      .run(mid, scope, k, v, me.id, ts);
     return { id: mid, key: k, value: v, scope: target };
   }
 
@@ -575,10 +691,226 @@ export class Store {
 
   snapshot(me: User) {
     return {
-      me,
+      me: {
+        ...me,
+        status: (this.db.prepare("SELECT status FROM users WHERE id = ?").get(me.id) as { status?: string } | undefined)
+          ?.status ?? "idle",
+        card: (this.db.prepare("SELECT card FROM users WHERE id = ?").get(me.id) as { card?: string } | undefined)?.card ?? "",
+      },
       people: this.people(me),
       rooms: this.listRooms(me),
       inbox: this.inbox(me, { unread: true, limit: 20 }),
+      reviews: this.listReviews(me),
+      handoffs: this.listHandoffs(me),
+      levels: LEVELS,
+      caps: ["message", "memory", "presence", "review", "handoff", "github"],
+      rule: "GitHub holds the code. Relay coordinates. You never get the other person's shell.",
+    };
+  }
+
+  setRoomGithub(me: User, slug: string, repo: string) {
+    const room = this.requireRoomMember(me, slug);
+    const r = repo.trim().replace(/^https?:\/\/github.com\//, "").replace(/\.git$/, "");
+    if (!/^[\w.-]+\/[\w.-]+$/.test(r)) throw new RelayError(400, "Use owner/repo (GitHub).");
+    this.db.prepare("UPDATE rooms SET github_repo = ? WHERE id = ?").run(r, room.id);
+    this.sendRoom(me, slug, `GitHub repo for this room is now ${r}. Agents: use local gh with YOUR login. Do not push with someone else's credentials.`, "github");
+    return this.getRoom(slug)!;
+  }
+
+  pointPr(me: User, handle: string, pr: string, ask: string) {
+    const other = this.getUserByHandle(handle);
+    if (!other) throw new RelayError(404, `No user @${handle}.`);
+    this.requireAllowed(me, other, "github");
+    const n = String(pr).replace(/^#/, "");
+    const body = [
+      `@${me.handle} asks @${other.handle} to look at PR #${n}.`,
+      ask.trim() ? `Ask: ${ask.trim()}` : "Please review with your local gh (gh pr view, gh pr diff).",
+      "Do not merge unless your human said so. GitHub is the source of truth.",
+    ].join("\n");
+    const msg = this.sendDm(me, handle, body, "github");
+    this.notify([me.id, other.id], { type: "github", pr: n, from: me.handle, to: other.handle });
+    return { ...msg, pr: n };
+  }
+
+  offerReview(
+    me: User,
+    handle: string,
+    spec: { path: string; title?: string; body: string; ask?: string },
+  ) {
+    const other = this.getUserByHandle(handle);
+    if (!other) throw new RelayError(404, `No user @${handle}.`);
+    this.requireAllowed(me, other, "review");
+    const path = spec.path.trim() || "snippet";
+    const title = (spec.title ?? path).trim();
+    const body = spec.body;
+    if (!body.trim()) throw new RelayError(400, "Review body (the code) is required.");
+    if (body.length > 80_000) throw new RelayError(400, "Patch too large (80k). Point at a PR instead.");
+    const rid = id("rev");
+    const t = now();
+    this.db
+      .prepare(
+        `INSERT INTO reviews (id, from_user, to_user, path, title, body, ask, verdict, comment, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', '', ?, ?)`,
+      )
+      .run(rid, me.id, other.id, path, title, body, (spec.ask ?? "").trim(), t, t);
+    this.sendDm(
+      me,
+      handle,
+      `Code review offered: ${title} (${path}). id=${rid}. ${spec.ask ? "Ask: " + spec.ask : "Please review."} Use: relay review show ${rid}`,
+      "review",
+    );
+    const item = this.getReview(me, rid);
+    this.notify([me.id, other.id], { type: "review", review: { id: rid, title, path } });
+    return item;
+  }
+
+  getReview(me: User, reviewId: string) {
+    const row = this.db.prepare("SELECT * FROM reviews WHERE id = ?").get(reviewId) as
+      | Record<string, unknown>
+      | undefined;
+    if (!row) throw new RelayError(404, "Review not found.");
+    if (row.from_user !== me.id && row.to_user !== me.id) throw new RelayError(403, "Not your review.");
+    return this.reviewPublic(row);
+  }
+
+  listReviews(me: User) {
+    const rows = this.db
+      .prepare(
+        "SELECT * FROM reviews WHERE from_user = ? OR to_user = ? ORDER BY created_at DESC LIMIT 50",
+      )
+      .all(me.id, me.id) as Record<string, unknown>[];
+    return rows.map((r) => this.reviewPublic(r, { omitBody: true }));
+  }
+
+  verdictReview(me: User, reviewId: string, verdict: string, comment: string) {
+    const row = this.db.prepare("SELECT * FROM reviews WHERE id = ?").get(reviewId) as
+      | Record<string, unknown>
+      | undefined;
+    if (!row) throw new RelayError(404, "Review not found.");
+    if (String(row.to_user) !== me.id) throw new RelayError(403, "Only the reviewer can verdict.");
+    const v = verdict.trim().toLowerCase();
+    if (!["lgtm", "changes", "pending"].includes(v)) throw new RelayError(400, "verdict: lgtm | changes | pending");
+    this.db
+      .prepare("UPDATE reviews SET verdict = ?, comment = ?, updated_at = ? WHERE id = ?")
+      .run(v, comment.trim(), now(), reviewId);
+    const from = this.getUser(String(row.from_user));
+    if (from) {
+      this.sendDm(me, from.handle, `Review ${reviewId} → ${v}. ${comment.trim()}`.trim(), "review");
+    }
+    return this.getReview(me, reviewId);
+  }
+
+  private reviewPublic(r: Record<string, unknown>, opts: { omitBody?: boolean } = {}) {
+    const from = this.getUser(String(r.from_user));
+    const to = this.getUser(String(r.to_user));
+    return {
+      id: String(r.id),
+      from: from?.handle,
+      to: to?.handle,
+      path: String(r.path),
+      title: String(r.title),
+      body: opts.omitBody ? undefined : String(r.body),
+      ask: String(r.ask ?? ""),
+      verdict: String(r.verdict),
+      comment: String(r.comment ?? ""),
+      created_at: Number(r.created_at),
+    };
+  }
+
+  offerHandoff(
+    me: User,
+    handle: string,
+    spec: { title: string; body?: string; branch?: string; pr?: string; acceptance?: string },
+  ) {
+    const other = this.getUserByHandle(handle);
+    if (!other) throw new RelayError(404, `No user @${handle}.`);
+    this.requireAllowed(me, other, "handoff");
+    const title = spec.title.trim();
+    if (!title) throw new RelayError(400, "Handoff title is required.");
+    const hid = id("hd");
+    const t = now();
+    this.db
+      .prepare(
+        `INSERT INTO handoffs (id, from_user, to_user, title, body, branch, pr, acceptance, status, note, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'offered', '', ?, ?)`,
+      )
+      .run(
+        hid,
+        me.id,
+        other.id,
+        title,
+        (spec.body ?? "").trim(),
+        (spec.branch ?? "").trim(),
+        (spec.pr ?? "").trim(),
+        (spec.acceptance ?? "").trim(),
+        t,
+        t,
+      );
+    this.sendDm(
+      me,
+      handle,
+      `Handoff offered: ${title} id=${hid}. Branch: ${spec.branch || "—"}. PR: ${spec.pr || "—"}. Accept with: relay handoff take ${hid}`,
+      "handoff",
+    );
+    this.notify([me.id, other.id], { type: "handoff", id: hid, title, status: "offered" });
+    return this.getHandoff(me, hid);
+  }
+
+  getHandoff(me: User, hid: string) {
+    const row = this.db.prepare("SELECT * FROM handoffs WHERE id = ?").get(hid) as
+      | Record<string, unknown>
+      | undefined;
+    if (!row) throw new RelayError(404, "Handoff not found.");
+    if (row.from_user !== me.id && row.to_user !== me.id) throw new RelayError(403, "Not your handoff.");
+    return this.handoffPublic(row);
+  }
+
+  listHandoffs(me: User) {
+    const rows = this.db
+      .prepare(
+        "SELECT * FROM handoffs WHERE from_user = ? OR to_user = ? ORDER BY updated_at DESC LIMIT 50",
+      )
+      .all(me.id, me.id) as Record<string, unknown>[];
+    return rows.map((r) => this.handoffPublic(r));
+  }
+
+  updateHandoff(me: User, hid: string, patch: { status?: string; note?: string }) {
+    const row = this.db.prepare("SELECT * FROM handoffs WHERE id = ?").get(hid) as
+      | Record<string, unknown>
+      | undefined;
+    if (!row) throw new RelayError(404, "Handoff not found.");
+    const status = (patch.status ?? String(row.status)).trim();
+    if (!["offered", "accepted", "done", "blocked"].includes(status)) {
+      throw new RelayError(400, "status: offered | accepted | done | blocked");
+    }
+    if (status === "accepted" && String(row.to_user) !== me.id) {
+      throw new RelayError(403, "Only the receiving agent can take a handoff.");
+    }
+    this.db
+      .prepare("UPDATE handoffs SET status = ?, note = ?, updated_at = ? WHERE id = ?")
+      .run(status, patch.note ?? String(row.note), now(), hid);
+    const otherId = String(row.from_user) === me.id ? String(row.to_user) : String(row.from_user);
+    const other = this.getUser(otherId);
+    if (other) this.sendDm(me, other.handle, `Handoff ${hid} is now ${status}. ${patch.note ?? ""}`.trim(), "handoff");
+    this.notify([me.id, otherId], { type: "handoff", id: hid, status });
+    return this.getHandoff(me, hid);
+  }
+
+  private handoffPublic(r: Record<string, unknown>) {
+    const from = this.getUser(String(r.from_user));
+    const to = this.getUser(String(r.to_user));
+    return {
+      id: String(r.id),
+      from: from?.handle,
+      to: to?.handle,
+      title: String(r.title),
+      body: String(r.body),
+      branch: String(r.branch ?? ""),
+      pr: String(r.pr ?? ""),
+      acceptance: String(r.acceptance ?? ""),
+      status: String(r.status),
+      note: String(r.note ?? ""),
+      updated_at: Number(r.updated_at),
     };
   }
 }

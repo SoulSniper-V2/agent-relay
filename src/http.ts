@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { RelayError, Store, type User } from "./store.ts";
 import { dashboardHtml } from "./dashboard.ts";
 import { sendMail } from "./email.ts";
+import type { RelayBus } from "./bus.ts";
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -42,8 +43,9 @@ function bearer(req: IncomingMessage): string | undefined {
   return req.headers.authorization;
 }
 
-export function createRelayServer(store: Store, opts: { publicUrl?: string } = {}) {
+export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?: RelayBus } = {}) {
   const publicUrl = opts.publicUrl ?? "";
+  const bus = opts.bus;
 
   const server = createServer(async (req, res) => {
     try {
@@ -280,6 +282,127 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string } = {
 
       if (method === "DELETE" && p.startsWith("/v1/tokens/")) {
         send(res, 200, store.revokeToken(need(), p.split("/")[3]));
+        return;
+      }
+
+      if (method === "GET" && p === "/v1/stream") {
+        const me = need();
+        if (!bus) {
+          send(res, 501, { error: "Live stream not enabled on this hub." });
+          return;
+        }
+        res.writeHead(200, {
+          "content-type": "text/event-stream; charset=utf-8",
+          "cache-control": "no-cache",
+          connection: "keep-alive",
+          "access-control-allow-origin": "*",
+        });
+        res.write(`data: ${JSON.stringify({ type: "hello", handle: me.handle, at: Date.now() })}\n\n`);
+        const unsub = bus.subscribe(me.id, (ev) => {
+          res.write(`data: ${JSON.stringify(ev)}\n\n`);
+        });
+        const ping = setInterval(() => {
+          res.write(`: ping ${Date.now()}\n\n`);
+        }, 15000);
+        req.on("close", () => {
+          unsub();
+          clearInterval(ping);
+        });
+        return;
+      }
+
+      if (method === "POST" && p === "/v1/grants") {
+        const me = need();
+        const b = await jsonBody(req);
+        send(res, 200, store.setGrants(me, String(b.handle ?? ""), {
+          caps: b.caps as string | string[] | undefined,
+          level: b.level != null ? String(b.level) : undefined,
+        }));
+        return;
+      }
+
+      if (method === "POST" && p === "/v1/status") {
+        const me = need();
+        const b = await jsonBody(req);
+        send(res, 200, store.setStatus(me, String(b.status ?? "working"), String(b.detail ?? "")));
+        return;
+      }
+
+      if (method === "POST" && p === "/v1/card") {
+        const me = need();
+        const b = await jsonBody(req);
+        send(res, 200, store.setCard(me, String(b.card ?? "")));
+        return;
+      }
+
+      if (method === "GET" && p === "/v1/reviews") {
+        send(res, 200, { reviews: store.listReviews(need()) });
+        return;
+      }
+
+      if (method === "POST" && p === "/v1/reviews") {
+        const me = need();
+        const b = await jsonBody(req);
+        send(res, 201, store.offerReview(me, String(b.to ?? ""), {
+          path: String(b.path ?? ""),
+          title: b.title != null ? String(b.title) : undefined,
+          body: String(b.body ?? ""),
+          ask: b.ask != null ? String(b.ask) : undefined,
+        }));
+        return;
+      }
+
+      if (method === "GET" && p.startsWith("/v1/reviews/")) {
+        send(res, 200, store.getReview(need(), p.split("/")[3]));
+        return;
+      }
+
+      if (method === "POST" && p.match(/^\/v1\/reviews\/[^/]+\/verdict$/)) {
+        const me = need();
+        const b = await jsonBody(req);
+        send(res, 200, store.verdictReview(me, p.split("/")[3], String(b.verdict ?? ""), String(b.comment ?? "")));
+        return;
+      }
+
+      if (method === "GET" && p === "/v1/handoffs") {
+        send(res, 200, { handoffs: store.listHandoffs(need()) });
+        return;
+      }
+
+      if (method === "POST" && p === "/v1/handoffs") {
+        const me = need();
+        const b = await jsonBody(req);
+        send(res, 201, store.offerHandoff(me, String(b.to ?? ""), {
+          title: String(b.title ?? ""),
+          body: b.body != null ? String(b.body) : undefined,
+          branch: b.branch != null ? String(b.branch) : undefined,
+          pr: b.pr != null ? String(b.pr) : undefined,
+          acceptance: b.acceptance != null ? String(b.acceptance) : undefined,
+        }));
+        return;
+      }
+
+      if (method === "POST" && p.startsWith("/v1/handoffs/")) {
+        const me = need();
+        const b = await jsonBody(req);
+        send(res, 200, store.updateHandoff(me, p.split("/")[3], {
+          status: b.status != null ? String(b.status) : undefined,
+          note: b.note != null ? String(b.note) : undefined,
+        }));
+        return;
+      }
+
+      if (method === "POST" && p.match(/^\/v1\/rooms\/[^/]+\/github$/)) {
+        const me = need();
+        const b = await jsonBody(req);
+        send(res, 200, store.setRoomGithub(me, p.split("/")[3], String(b.repo ?? "")));
+        return;
+      }
+
+      if (method === "POST" && p === "/v1/github/pr") {
+        const me = need();
+        const b = await jsonBody(req);
+        send(res, 201, store.pointPr(me, String(b.to ?? ""), String(b.pr ?? ""), String(b.ask ?? "")));
         return;
       }
 

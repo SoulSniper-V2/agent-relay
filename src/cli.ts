@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import { RelayClient } from "./client.ts";
 import { loadConfig, saveConfig } from "./config.ts";
 
@@ -43,8 +44,34 @@ Setup (agent-native)
 
 People
   relay invite [--email addr]   Mint a code; optionally email it
-  relay accept <code>           Connect to whoever invited you
-  relay people                  Who you can talk to
+  relay accept <code>
+  relay people                  Status, cards, what they allow you
+  relay grant <handle> --level pair|cofounder|visitor
+  relay grant <handle> review,handoff,github
+  relay card <text>             What YOUR agent is willing to do
+  relay status working [detail] Presence for the other agent
+
+Talk (live)
+  relay send <handle|#room> <text>
+  relay inbox [--unread] [--wait=sec]
+  relay live                    SSE until Ctrl+C (working together)
+
+Code review (does not write their disk)
+  relay review offer <handle> --path src/x.ts --file src/x.ts [--ask "..."]
+  relay review list
+  relay review show <id>
+  relay review verdict <id> lgtm|changes [--comment "..."]
+
+Handoffs (structured, not chat dumps)
+  relay handoff offer <handle> <title> [--body] [--branch] [--pr] [--accept]
+  relay handoff list
+  relay handoff take <id>
+  relay handoff done <id> [--note]
+
+GitHub is the repo — we only point
+  relay github <room-slug> owner/repo
+  relay pr <handle> <number> [--ask "..."]
+  Then use local: gh pr view / gh pr diff / gh pr checkout  (YOUR credentials)
 
 Talk
   relay send <handle> <text>    DM a person's agent
@@ -234,7 +261,145 @@ Env: RELAY_URL  RELAY_TOKEN  RELAY_CONFIG  RELAY_PORT  RELAY_DB
         out(await api.request("POST", `/v1/rooms/${slug}/members`, { handle }));
         return;
       }
-      fail("Usage: relay room create <title> | relay room add <slug> <handle>");
+      fail("Usage: relay room create <title> | relay room add <slug> <handle> | relay github <slug> owner/repo");
+    }
+
+    if (cmd === "grant") {
+      const handle = argv[1]?.replace(/^@/, "");
+      if (!handle) fail("Usage: relay grant <handle> --level pair|cofounder|visitor  OR  relay grant <handle> review,handoff");
+      const { api } = authed();
+      const level = flag(argv, "level");
+      const caps = argv.slice(2).find((a) => !a.startsWith("--"));
+      out(await api.request("POST", "/v1/grants", { handle, level, caps }));
+      return;
+    }
+
+    if (cmd === "card") {
+      const card = argv.slice(1).join(" ");
+      if (!card) fail("Usage: relay card <what your agent does>");
+      const { api } = authed();
+      out(await api.request("POST", "/v1/card", { card }));
+      return;
+    }
+
+    if (cmd === "status") {
+      const status = argv[1] ?? "working";
+      const detail = argv.slice(2).join(" ");
+      const { api } = authed();
+      out(await api.request("POST", "/v1/status", { status, detail }));
+      return;
+    }
+
+    if (cmd === "review") {
+      const sub = argv[1];
+      const { api } = authed();
+      if (sub === "list") {
+        out(await api.request("GET", "/v1/reviews"));
+        return;
+      }
+      if (sub === "show") {
+        if (!argv[2]) fail("Usage: relay review show <id>");
+        out(await api.request("GET", `/v1/reviews/${argv[2]}`));
+        return;
+      }
+      if (sub === "verdict") {
+        const id = argv[2];
+        const verdict = argv[3];
+        if (!id || !verdict) fail("Usage: relay review verdict <id> lgtm|changes [--comment]");
+        out(await api.request("POST", `/v1/reviews/${id}/verdict`, {
+          verdict,
+          comment: flag(argv, "comment") ?? "",
+        }));
+        return;
+      }
+      if (sub === "offer") {
+        const handle = argv[2]?.replace(/^@/, "");
+        const file = flag(argv, "file");
+        const path = flag(argv, "path") ?? file ?? "snippet";
+        const ask = flag(argv, "ask") ?? "";
+        const title = flag(argv, "title");
+        let body = flag(argv, "body") ?? "";
+        if (file) body = readFileSync(file, "utf8");
+        if (!handle || !body) fail("Usage: relay review offer <handle> --file <path> [--ask] [--path]");
+        out(await api.request("POST", "/v1/reviews", { to: handle, path, title, body, ask }));
+        return;
+      }
+      fail("Usage: relay review offer|list|show|verdict");
+    }
+
+    if (cmd === "handoff") {
+      const sub = argv[1];
+      const { api } = authed();
+      if (sub === "list") {
+        out(await api.request("GET", "/v1/handoffs"));
+        return;
+      }
+      if (sub === "offer") {
+        const handle = argv[2]?.replace(/^@/, "");
+        const title = argv.filter((a) => !a.startsWith("--")).slice(3).join(" ") || flag(argv, "title");
+        if (!handle || !title) fail("Usage: relay handoff offer <handle> <title> [--body] [--branch] [--pr] [--accept]");
+        out(await api.request("POST", "/v1/handoffs", {
+          to: handle,
+          title,
+          body: flag(argv, "body"),
+          branch: flag(argv, "branch"),
+          pr: flag(argv, "pr"),
+          acceptance: flag(argv, "accept"),
+        }));
+        return;
+      }
+      if (sub === "take") {
+        if (!argv[2]) fail("Usage: relay handoff take <id>");
+        out(await api.request("POST", `/v1/handoffs/${argv[2]}`, { status: "accepted" }));
+        return;
+      }
+      if (sub === "done") {
+        if (!argv[2]) fail("Usage: relay handoff done <id> [--note]");
+        out(await api.request("POST", `/v1/handoffs/${argv[2]}`, { status: "done", note: flag(argv, "note") }));
+        return;
+      }
+      fail("Usage: relay handoff offer|list|take|done");
+    }
+
+    if (cmd === "github") {
+      const slug = argv[1]?.replace(/^#/, "");
+      const repo = argv[2];
+      if (!slug || !repo) fail("Usage: relay github <room-slug> owner/repo");
+      const { api } = authed();
+      out(await api.request("POST", `/v1/rooms/${slug}/github`, { repo }));
+      return;
+    }
+
+    if (cmd === "pr") {
+      const handle = argv[1]?.replace(/^@/, "");
+      const pr = argv[2];
+      if (!handle || !pr) fail("Usage: relay pr <handle> <number> [--ask]");
+      const { api } = authed();
+      out(await api.request("POST", "/v1/github/pr", { to: handle, pr, ask: flag(argv, "ask") ?? "" }));
+      return;
+    }
+
+    if (cmd === "live") {
+      const { cfg } = authed();
+      const url = `${cfg.url.replace(/\/$/, "")}/v1/stream`;
+      const res = await fetch(url, { headers: { authorization: `Bearer ${cfg.token}` } });
+      if (!res.ok || !res.body) fail(`live failed: ${res.status} ${await res.text()}`);
+      process.stderr.write("live stream — Ctrl+C to stop\n");
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop() ?? "";
+        for (const p of parts) {
+          const line = p.split("\n").find((l) => l.startsWith("data: "));
+          if (line) out(JSON.parse(line.slice(6)));
+        }
+      }
+      return;
     }
 
     if (cmd === "remember") {

@@ -166,6 +166,88 @@ const tools = [
       required: ["id"],
     },
   },
+  {
+    name: "relay_grant",
+    description: "Set what another person's agent is allowed to do TO YOU. level: visitor|pair|cofounder, or caps like review,handoff,github. Ask your human first.",
+    inputSchema: {
+      type: "object",
+      properties: { handle: { type: "string" }, level: { type: "string" }, caps: { type: "string" } },
+      required: ["handle"],
+    },
+  },
+  {
+    name: "relay_card",
+    description: "Publish what YOUR agent is willing to do (review, backend, no merge, …).",
+    inputSchema: { type: "object", properties: { card: { type: "string" } }, required: ["card"] },
+  },
+  {
+    name: "relay_status",
+    description: "Set live presence so the other agent sees you working.",
+    inputSchema: {
+      type: "object",
+      properties: { status: { type: "string" }, detail: { type: "string" } },
+      required: ["status"],
+    },
+  },
+  {
+    name: "relay_review_offer",
+    description: "Send code for the other agent to review. Does not write their disk. Needs their 'review' grant.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        to: { type: "string" },
+        path: { type: "string" },
+        body: { type: "string" },
+        ask: { type: "string" },
+        title: { type: "string" },
+      },
+      required: ["to", "body"],
+    },
+  },
+  {
+    name: "relay_review_show",
+    description: "Read a code-review packet including the snippet.",
+    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+  },
+  {
+    name: "relay_review_verdict",
+    description: "Reply to a review you received: lgtm or changes.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string" }, verdict: { type: "string" }, comment: { type: "string" } },
+      required: ["id", "verdict"],
+    },
+  },
+  {
+    name: "relay_handoff_offer",
+    description: "Structured handoff (title, branch, PR, acceptance). Not a chat dump. Needs 'handoff' grant.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        to: { type: "string" },
+        title: { type: "string" },
+        body: { type: "string" },
+        branch: { type: "string" },
+        pr: { type: "string" },
+        acceptance: { type: "string" },
+      },
+      required: ["to", "title"],
+    },
+  },
+  {
+    name: "relay_handoff_take",
+    description: "Accept a handoff offered to you, then do the work locally / via GitHub.",
+    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+  },
+  {
+    name: "relay_pr",
+    description: "Point the other agent at a GitHub PR number. They use THEIR gh. Needs 'github' grant.",
+    inputSchema: {
+      type: "object",
+      properties: { to: { type: "string" }, pr: { type: "string" }, ask: { type: "string" } },
+      required: ["to", "pr"],
+    },
+  },
 ];
 
 function api(requireToken = true) {
@@ -217,6 +299,24 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<un
       return api().request("GET", `/v1/plans?target=${encodeURIComponent(String(args.target))}`);
     case "relay_plan_update":
       return api().request("PATCH", `/v1/plans/${args.id}`, args);
+    case "relay_grant":
+      return api().request("POST", "/v1/grants", args);
+    case "relay_card":
+      return api().request("POST", "/v1/card", args);
+    case "relay_status":
+      return api().request("POST", "/v1/status", args);
+    case "relay_review_offer":
+      return api().request("POST", "/v1/reviews", args);
+    case "relay_review_show":
+      return api().request("GET", `/v1/reviews/${args.id}`);
+    case "relay_review_verdict":
+      return api().request("POST", `/v1/reviews/${args.id}/verdict`, args);
+    case "relay_handoff_offer":
+      return api().request("POST", "/v1/handoffs", args);
+    case "relay_handoff_take":
+      return api().request("POST", `/v1/handoffs/${args.id}`, { status: "accepted" });
+    case "relay_pr":
+      return api().request("POST", "/v1/github/pr", args);
     default:
       throw new Error(`Unknown tool ${name}`);
   }

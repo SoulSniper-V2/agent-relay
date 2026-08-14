@@ -1,0 +1,26 @@
+# agent-relay — do not deploy until you set secrets.
+# fly launch --copy-config  then fly secrets set RELAY_RESEND_KEY=... RELAY_FROM_EMAIL=...
+app = "agent-relay"
+primary_region = "iad"
+
+[build]
+
+[env]
+  RELAY_PORT = "8787"
+  RELAY_PUBLIC_URL = "https://agent-relay.fly.dev"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[mounts]]
+  source = "relay_data"
+  destination = "/data"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

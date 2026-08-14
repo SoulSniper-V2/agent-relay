@@ -91,11 +91,55 @@ export function openDb(path: string): DatabaseSync {
       last_used INTEGER,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS grants (
+      owner_id TEXT NOT NULL,
+      peer_id TEXT NOT NULL,
+      caps TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (owner_id, peer_id)
+    );
+    CREATE TABLE IF NOT EXISTS reviews (
+      id TEXT PRIMARY KEY,
+      from_user TEXT NOT NULL,
+      to_user TEXT NOT NULL,
+      path TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      ask TEXT NOT NULL DEFAULT '',
+      verdict TEXT NOT NULL DEFAULT 'pending',
+      comment TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS handoffs (
+      id TEXT PRIMARY KEY,
+      from_user TEXT NOT NULL,
+      to_user TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL DEFAULT '',
+      branch TEXT NOT NULL DEFAULT '',
+      pr TEXT NOT NULL DEFAULT '',
+      acceptance TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'offered',
+      note TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
-  try {
-    db.exec("ALTER TABLE users ADD COLUMN email TEXT");
-  } catch {
-    /* already migrated */
+  const alters = [
+    "ALTER TABLE users ADD COLUMN email TEXT",
+    "ALTER TABLE users ADD COLUMN status TEXT",
+    "ALTER TABLE users ADD COLUMN card TEXT",
+    "ALTER TABLE rooms ADD COLUMN github_repo TEXT",
+    "ALTER TABLE messages ADD COLUMN reply_to TEXT",
+    "ALTER TABLE messages ADD COLUMN payload TEXT",
+  ];
+  for (const sql of alters) {
+    try {
+      db.exec(sql);
+    } catch {
+      /* already migrated */
+    }
   }
   try {
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users(email) WHERE email IS NOT NULL");

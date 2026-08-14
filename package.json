@@ -13,8 +13,10 @@
     "test": "node --experimental-sqlite --import tsx --test test/*.test.ts",
     "build": "tsc"
   },
+  "dependencies": {
+    "tsx": "^4.20.5"
+  },
   "devDependencies": {
-    "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   },
   "engines": {
