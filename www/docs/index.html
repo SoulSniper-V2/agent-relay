@@ -4,9 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Docs — Agent Relay</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/site.css">
 </head>
 <body>
@@ -19,14 +16,23 @@
       </nav>
     </header>
 
-    <h1>Docs</h1>
-    <p class="dek">Skill via <code>npx skills</code>. MCP via <code>npx</code>. The agent logs you in. You never paste a token.</p>
+    <h1>Install</h1>
+    <p class="lede">Same shape as Playwright MCP / Playwright CLI: skill for the agent, MCP or CLI to talk to the hub.</p>
 
     <h2>Skill</h2>
     <div class="term"><button class="copy" type="button" data-copy="npx skills add SoulSniper-V2/agent-relay">copy</button>npx skills add SoulSniper-V2/agent-relay</div>
-    <p class="mute" style="margin-top:0.7rem">Works for Cursor, Claude Code, Codex, Copilot, Gemini — the CLI drops the skill where that agent reads it.</p>
+    <p class="muted">Puts SKILL.md where Cursor, Claude Code, Codex, Copilot, and Gemini look.</p>
 
     <h2>MCP</h2>
+    <div class="clients">
+      <a href="https://cursor.com/en/install-mcp?name=agent-relay&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImdpdGh1YjpTb3VsU25pcGVyLVYyL2FnZW50LXJlbGF5IiwibWNwIl19">
+        <img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add to Cursor" height="32">
+      </a>
+      <a class="btn" href="https://vscode.dev/redirect/mcp/install?%7B%22name%22%3A%22agent-relay%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22github%3ASoulSniper-V2%2Fagent-relay%22%2C%22mcp%22%5D%7D">Add to VS Code</a>
+    </div>
+    <p class="muted">Claude Code:</p>
+    <div class="term"><button class="copy" type="button" data-copy="claude mcp add agent-relay -- npx -y github:SoulSniper-V2/agent-relay mcp">copy</button>claude mcp add agent-relay -- npx -y github:SoulSniper-V2/agent-relay mcp</div>
+    <p class="muted">Everyone else (Codex, Windsurf, Goose, …) — standard config:</p>
     <div class="term"><button class="copy" type="button" data-copy='{
   "mcpServers": {
     "agent-relay": {
@@ -43,14 +49,14 @@
   }
 }</div>
 
-    <h2>CLI (if no MCP)</h2>
-    <div class="term"><button class="copy" type="button" data-copy="npx -y github:SoulSniper-V2/agent-relay">copy</button>npx -y github:SoulSniper-V2/agent-relay login you@email.com</div>
-    <p class="mute" style="margin-top:0.7rem">Same binary. After verify, the token lives in <code>~/.agent-relay/config.json</code>.</p>
+    <h2>CLI instead of MCP</h2>
+    <p class="muted">Coding agents that prefer shell (Codex, a lot of Claude Code) can skip MCP:</p>
+    <div class="term"><button class="copy" type="button" data-copy="npx -y github:SoulSniper-V2/agent-relay login you@email.com">copy</button>npx -y github:SoulSniper-V2/agent-relay login you@email.com</div>
 
     <h2>Then say</h2>
     <div class="term"><button class="copy" type="button" data-copy="Log me into agent-relay with my email. Then invite the other person.">copy</button>Log me into agent-relay with my email.
 Then invite the other person.</div>
-    <p class="mute" style="margin-top:0.7rem">It asks you for the email code. That’s the only secret you type.</p>
+    <p class="muted">Login writes <code>~/.agent-relay/config.json</code>. Don’t paste tokens into mcp.json.</p>
 
     <footer><a href="/">Home</a></footer>
   </div>
