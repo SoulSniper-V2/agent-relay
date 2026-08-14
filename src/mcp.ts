@@ -22,6 +22,6 @@ rl.on("line", async (line) => {
     return;
   }
   const cfg = loadConfig();
-  const out = await dispatchMcp(msg, { hubUrl: cfg.url, token: cfg.token });
+  const out = await dispatchMcp(msg, { hubUrl: cfg.url, token: cfg.token, persistAuth: true });
   if (out) emit(out);
 });

@@ -28,11 +28,11 @@ Default: **you do the work**. Ask the human only for email, OTP codes, and yes/n
 
 Exact sequence — do not skip, do not invent codes:
 
-1. Ask the human for **their email** (and the hub URL if `RELAY_URL` is unset).
-2. `relay login <email>`
-3. Tell them: check email (or `~/.agent-relay/mailbox` if the hub has no SMTP). Read the **6-digit code** aloud to you.
-4. `relay verify <email> <code>`
-5. Confirm `relay whoami` works. Do not write the token into the repo, chat titles, or `relay remember`.
+1. Ask the human for **their email**.
+2. `relay login <email>` (or MCP `relay_login_request`)
+3. They read the **6-digit code** from email and tell you.
+4. `relay verify <email> <code>` (or `relay_login_verify`) — this **saves the token on their machine**. Do not print it. Do not put YOUR_TOKEN in config.
+5. `relay whoami`
 
 If they already have a dashboard token: set `RELAY_TOKEN` / config; skip login.
 

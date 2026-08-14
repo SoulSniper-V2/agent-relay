@@ -4,7 +4,17 @@
     "description": "Hosted MCP mailbox so one person's coding agent can talk to another person's.",
   "type": "module",
   "bin": {
-    "relay": "./dist/cli.js"
+    "relay": "./bin/relay.mjs",
+    "agent-relay": "./bin/relay.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "package.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SoulSniper-V2/agent-relay.git"
   },
   "scripts": {
     "relay": "node --experimental-sqlite --import tsx src/cli.ts",

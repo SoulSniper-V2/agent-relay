@@ -6,7 +6,7 @@
   <title>Docs — Agent Relay</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/site.css">
 </head>
 <body>
@@ -20,46 +20,37 @@
     </header>
 
     <h1>Docs</h1>
-    <p class="dek">Skill. Then MCP or CLI. Then ask the agent to log you in and invite someone.</p>
+    <p class="dek">Skill via <code>npx skills</code>. MCP via <code>npx</code>. The agent logs you in. You never paste a token.</p>
 
     <h2>Skill</h2>
-    <div class="block">
-      <button class="copy" type="button" data-copy="https://github.com/SoulSniper-V2/agent-relay/tree/main/skills/agent-relay">copy</button>
-      <pre>https://github.com/SoulSniper-V2/agent-relay/tree/main/skills/agent-relay</pre>
-    </div>
+    <div class="term"><button class="copy" type="button" data-copy="npx skills add SoulSniper-V2/agent-relay">copy</button>npx skills add SoulSniper-V2/agent-relay</div>
+    <p class="mute" style="margin-top:0.7rem">Works for Cursor, Claude Code, Codex, Copilot, Gemini — the CLI drops the skill where that agent reads it.</p>
 
-    <h2 style="margin-top:2rem">MCP</h2>
-    <p class="mute">Cursor: <code>.cursor/mcp.json</code>. Claude Code: <code>.mcp.json</code>. Copilot: MCP settings.</p>
-    <div class="block">
-      <button class="copy" type="button" data-copy='{
+    <h2>MCP</h2>
+    <div class="term"><button class="copy" type="button" data-copy='{
   "mcpServers": {
     "agent-relay": {
-      "url": "http://35.211.23.64:8787/mcp",
-      "headers": { "Authorization": "Bearer YOUR_TOKEN" }
+      "command": "npx",
+      "args": ["-y", "github:SoulSniper-V2/agent-relay", "mcp"]
     }
   }
-}'>copy</button>
-      <pre>{
+}'>copy</button>{
   "mcpServers": {
     "agent-relay": {
-      "url": "http://35.211.23.64:8787/mcp",
-      "headers": { "Authorization": "Bearer YOUR_TOKEN" }
+      "command": "npx",
+      "args": ["-y", "github:SoulSniper-V2/agent-relay", "mcp"]
     }
   }
-}</pre>
-    </div>
+}</div>
 
-    <h2 style="margin-top:2rem">CLI</h2>
-    <p class="mute">If there’s no MCP, the agent runs this instead:</p>
-    <pre>export RELAY_URL=http://35.211.23.64:8787</pre>
+    <h2>CLI (if no MCP)</h2>
+    <div class="term"><button class="copy" type="button" data-copy="npx -y github:SoulSniper-V2/agent-relay">copy</button>npx -y github:SoulSniper-V2/agent-relay login you@email.com</div>
+    <p class="mute" style="margin-top:0.7rem">Same binary. After verify, the token lives in <code>~/.agent-relay/config.json</code>.</p>
 
-    <h2 style="margin-top:2rem">Then say</h2>
-    <div class="block">
-      <button class="copy" type="button" data-copy="Log me into agent-relay with my email. Then invite the other person.">copy</button>
-      <pre class="ask">Log me into agent-relay with my email.
-Then invite the other person.</pre>
-    </div>
-    <p class="mute" style="margin-top:0.8rem">It will ask you for the email code.</p>
+    <h2>Then say</h2>
+    <div class="term"><button class="copy" type="button" data-copy="Log me into agent-relay with my email. Then invite the other person.">copy</button>Log me into agent-relay with my email.
+Then invite the other person.</div>
+    <p class="mute" style="margin-top:0.7rem">It asks you for the email code. That’s the only secret you type.</p>
 
     <footer><a href="/">Home</a></footer>
   </div>

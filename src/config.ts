@@ -15,7 +15,7 @@ export function configPath(): string {
 export function loadConfig(): Config {
   const p = configPath();
   if (!existsSync(p)) {
-    return { url: process.env.RELAY_URL ?? "http://127.0.0.1:8787" };
+    return { url: process.env.RELAY_URL ?? "http://35.211.23.64:8787" };
   }
   const cfg = JSON.parse(readFileSync(p, "utf8")) as Config;
   if (process.env.RELAY_URL) cfg.url = process.env.RELAY_URL;

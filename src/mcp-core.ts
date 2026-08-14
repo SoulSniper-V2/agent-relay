@@ -2,6 +2,7 @@
  * MCP JSON-RPC: used by stdio (local Cursor) and Streamable HTTP POST /mcp (hosted).
  */
 import { RelayClient } from "./client.ts";
+import { loadConfig, saveConfig } from "./config.ts";
 
 export type Rpc = { jsonrpc: "2.0"; id?: number | string; method?: string; params?: Record<string, unknown> };
 
@@ -20,7 +21,7 @@ export const MCP_TOOLS = [
   },
   {
     name: "relay_login_verify",
-    description: "Finish login with the 6-digit code the human read from email. Saves nothing; returns a token for RELAY_TOKEN.",
+    description: "Finish login with the 6-digit code. Saves the token on this machine. Never paste the token into chat.",
     inputSchema: {
       type: "object",
       properties: { email: { type: "string" }, code: { type: "string" } },
@@ -274,13 +275,24 @@ async function callTool(
   token: string | undefined,
   name: string,
   args: Record<string, unknown>,
+  persistAuth: boolean,
 ): Promise<unknown> {
   const need = !OPEN_TOOLS.has(name);
   switch (name) {
     case "relay_login_request":
       return api(hubUrl, token, need).request("POST", "/v1/auth/request", { email: args.email });
-    case "relay_login_verify":
-      return api(hubUrl, token, need).request("POST", "/v1/auth/verify", { email: args.email, code: args.code });
+    case "relay_login_verify": {
+      const res = await api(hubUrl, token, need).request<{
+        token: string;
+        user: { handle: string };
+      }>("POST", "/v1/auth/verify", { email: args.email, code: args.code });
+      if (persistAuth && res.token) {
+        const cfg = loadConfig();
+        saveConfig({ url: cfg.url || hubUrl, handle: res.user.handle, token: res.token });
+        return { ok: true, handle: res.user.handle, saved: true };
+      }
+      return res;
+    }
     case "relay_whoami":
       return api(hubUrl, token, need).request("GET", "/v1/me");
     case "relay_invite":
@@ -348,7 +360,7 @@ export type McpJson = { jsonrpc: "2.0"; id?: number | string; result?: unknown; 
 /** null = notification, no HTTP/stdio body */
 export async function dispatchMcp(
   msg: Rpc,
-  opts: { hubUrl: string; token?: string },
+  opts: { hubUrl: string; token?: string; persistAuth?: boolean },
 ): Promise<McpJson | null> {
   const { id, method, params } = msg;
   const notify = id === undefined;
@@ -372,7 +384,7 @@ export async function dispatchMcp(
     if (method === "tools/call") {
       const name = String(params?.name ?? "");
       const args = (params?.arguments ?? {}) as Record<string, unknown>;
-      const result = await callTool(opts.hubUrl, opts.token, name, args);
+      const result = await callTool(opts.hubUrl, opts.token, name, args, opts.persistAuth === true);
       return {
         jsonrpc: "2.0",
         id,
