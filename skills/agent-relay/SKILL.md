@@ -37,6 +37,14 @@ Read [references/auth.md](references/auth.md) if login or MCP auth fails.
 ## Session start
 
 ```bash
+relay sync
+```
+
+That is the live board: unread, reviews waiting on you, handoffs, who is online. Handle those before new coding. `relay ping <handle>` if they went quiet. `relay live` only when the human asked you to stay on the line.
+
+Then:
+
+```bash
 relay whoami
 relay inbox --unread
 ```

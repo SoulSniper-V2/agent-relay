@@ -1,86 +1,47 @@
 # Agent Relay
 
-Let **your** coding agent talk to **another person's** agent — a friend, cofounder, or contractor. Not another subagent in the same chat. Two humans, two machines, one hub.
+Your coding agent talks to **another person's** agent — cofounder, friend, contractor. Not a subagent in the same chat. Two humans, two machines, one hub.
 
-Agent-first: you say *invite Maya*, *log me in*, *tell her agent we own webhooks*. The skill plus CLI (or MCP) does it. There is a **small dashboard** at `/` only to mint extra tokens and glance at people — GitHub’s MCP uses the same PAT-on-a-website pattern.
+GitHub (or git) stays the source of truth for code. This project is the **mailbox + grants + review/handoff packets**.
 
-Auth research (MCP spec, GitHub MCP, Agent Skills spec) is in [docs/RESEARCH.md](docs/RESEARCH.md). Short version: email OTP for the human, personal access tokens for agents, OAuth 2.1 later for hosted Streamable HTTP.
+## Quick start (two people)
 
-## MCP vs CLI vs Skill (what we chose)
+1. One of you runs the hub: `npm install && npm run serve`
+2. Both set `RELAY_URL` to that URL (localhost only works on one machine — for real use, host it; see [docs/HOSTING.md](docs/HOSTING.md))
+3. Tell **your** agent your email. It runs `relay login` / `relay verify` with the code from email (or `~/.agent-relay/mailbox` if SMTP is unset)
+4. `relay invite --email them@…` → they `relay accept <code>`
+5. `relay grant them --level pair` if you want them to send code reviews
+6. Work: `relay sync` every session. Point at PRs with `relay pr`. Review files with `relay review offer --file`
 
-| Piece | What it is | In this project |
-|---|---|---|
-| **Skill** (`SKILL.md`) | Playbook the agent loads on demand | [skills/agent-relay/SKILL.md](skills/agent-relay/SKILL.md) — when to invite, how to poll, never dump secrets |
-| **CLI** (`relay`) | What the agent actually runs | Primary interface. Works in Cursor, Claude Code, Codex, cloud agents, cron |
-| **MCP** | JSON-RPC tools the host can call | Optional: `relay mcp` / `src/mcp.ts` — same hub, same auth |
-| **A2A** | Google/Linux Foundation protocol for agent-to-agent peers | **Not v1.** Cross-person identity and consent are the product; A2A can wrap this later |
+Copy [skills/agent-relay](skills/agent-relay) into your agent's skills dir (Cursor: `.cursor/skills/`). Project instructions for agents: [AGENTS.md](AGENTS.md).
 
-Skills do not open a network socket. MCP does not teach judgment. A CLI without a skill gets ignored or used badly. **Skill + CLI is the portable pair.** MCP is for hosts that prefer tools over shell.
+## What you get
 
-Both people must point at the **same hub URL**. One of you runs `relay serve` (laptop, Fly, a VPS). That is the mailbox. Agents are often offline, so this is async by default (`inbox --wait` when you really need to block).
+- **Live enough for agents:** `relay sync` (turn-based board), `relay live` (SSE), `relay ping`
+- **Grants:** you control what *their* agent may do to you (`visitor` / `pair` / `cofounder`)
+- **Reviews & handoffs:** snippets and structured tasks — not a shared disk
+- **GitHub pointing:** PR numbers; each agent uses **their** `gh`
+- **CLI + optional MCP + skill** so Cursor, Claude Code, Codex, Gemini, Copilot can join without a custom app
 
-## Install
+## Docs
 
-```bash
-cd agent-relay
-npm install
-```
+| Doc | Who |
+|---|---|
+| [AGENTS.md](AGENTS.md) | Coding agents |
+| [docs/INTEGRATION.md](docs/INTEGRATION.md) | Cursor / Claude / Codex / Gemini / Copilot |
+| [docs/HOSTING.md](docs/HOSTING.md) | When you actually host (not deployed yet) |
+| [docs/RESEARCH.md](docs/RESEARCH.md) | MCP auth, skills spec, GitHub PAT vs OAuth |
+| [skills/agent-relay/SKILL.md](skills/agent-relay/SKILL.md) | Runtime playbook |
 
-Copy the skill into your agent (Cursor example):
-
-```bash
-mkdir -p .cursor/skills
-cp -R skills/agent-relay .cursor/skills/
-```
-
-Claude Code: copy to `~/.claude/skills/agent-relay/`.
-
-## Two-person loop
-
-**You**
-
-```bash
-npm run serve
-export RELAY_URL=http://127.0.0.1:8787
-# tell your agent your email, or:
-npx tsx src/cli.ts login you@example.com
-npx tsx src/cli.ts verify you@example.com 123456
-npx tsx src/cli.ts invite --email friend@example.com
-```
-
-Open `http://127.0.0.1:8787` to mint a token for MCP. Without `RELAY_RESEND_KEY`, codes land in `~/.agent-relay/mailbox/`.
-
-**Friend** (same `RELAY_URL`, reachable from their machine)
-
-```bash
-npx tsx src/cli.ts login friend@example.com
-npx tsx src/cli.ts verify friend@example.com <code>
-npx tsx src/cli.ts accept <invite-code>
-```
-
-Then either agent:
-
-```bash
-npx tsx src/cli.ts send maya "Please own src/webhooks.ts; Stripe events live in memory key api.webhooks"
-npx tsx src/cli.ts remember maya api.webhooks "POST /stripe/webhook"
-npx tsx src/cli.ts plan create maya "Ship webhooks" --body "Sam: types. Maya: handler + tests."
-npx tsx src/cli.ts inbox --unread
-```
-
-Tell your agent: *check relay inbox*, *offer Maya a review of src/auth.ts*, *grant Maya pair*, *point her at PR 14*. Skill: [skills/agent-relay/SKILL.md](skills/agent-relay/SKILL.md). Hosting (not deployed): [docs/HOSTING.md](docs/HOSTING.md).
-
-## MCP (optional)
-
-After `relay login` / `relay verify` (or a token from `/`), put `RELAY_TOKEN` in [examples/mcp.json](examples/mcp.json).
-
-## What is in / not in
-
-**In:** email OTP, dashboard PATs, grants (visitor/pair/cofounder), presence, live SSE, code-review packets, structured handoffs, GitHub PR pointing (git stays git), CLI, MCP, skill.
-
-**Not in:** remote shell, merging for them, replacing GitHub, hosted OAuth MCP. See [docs/HOSTING.md](docs/HOSTING.md).
-
-## Tests
+## Develop
 
 ```bash
 npm test
+npx tsx src/cli.ts help
 ```
+
+Node 22. Private GitHub repo: log in with `gh auth login`, then `bash scripts/create-private-repo.sh`.
+
+## License
+
+MIT
