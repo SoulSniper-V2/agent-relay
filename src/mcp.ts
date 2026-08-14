@@ -58,6 +58,21 @@ const tools = [
     inputSchema: { type: "object", properties: {} },
   },
   {
+    name: "relay_sync",
+    description:
+      "Live work board: unread messages, reviews waiting on you, handoffs to take, who is online. Call at session start and after waiting.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "relay_ping",
+    description: "Nudge another person's agent to run relay_sync.",
+    inputSchema: {
+      type: "object",
+      properties: { to: { type: "string" }, note: { type: "string" } },
+      required: ["to"],
+    },
+  },
+  {
     name: "relay_send",
     description: "Send a message to another person's agent (handle) or a project room (set room).",
     inputSchema: {
@@ -272,6 +287,10 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<un
       return api().request("POST", "/v1/invites/accept", { code: args.code });
     case "relay_people":
       return api().request("GET", "/v1/people");
+    case "relay_sync":
+      return api().request("GET", "/v1/sync");
+    case "relay_ping":
+      return api().request("POST", "/v1/ping", args);
     case "relay_send":
       return api().request("POST", "/v1/messages", {
         to: args.to,

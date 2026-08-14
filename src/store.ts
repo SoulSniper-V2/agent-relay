@@ -442,17 +442,55 @@ export class Store {
     return room;
   }
 
-  sendDm(me: User, handle: string, body: string, kind = "chat") {
+  sendDm(me: User, handle: string, body: string, kind = "chat", replyTo?: string) {
     const other = this.getUserByHandle(handle);
     if (!other) throw new RelayError(404, `No user @${normalizeHandle(handle)} on this hub.`);
     this.requireContact(me, other);
     if (kind !== "system") this.requireAllowed(me, other, "message");
-    return this.insertMessage(me.id, other.id, null, body, kind);
+    return this.insertMessage(me.id, other.id, null, body, kind, replyTo);
   }
 
-  sendRoom(me: User, slug: string, body: string, kind = "chat") {
+  sendRoom(me: User, slug: string, body: string, kind = "chat", replyTo?: string) {
     const room = this.requireRoomMember(me, slug);
-    return this.insertMessage(me.id, null, room.id, body, kind);
+    return this.insertMessage(me.id, null, room.id, body, kind, replyTo);
+  }
+
+  ping(me: User, handle: string, note = "") {
+    const other = this.getUserByHandle(handle);
+    if (!other) throw new RelayError(404, `No user @${handle}.`);
+    this.requireAllowed(me, other, "message");
+    const body = note.trim()
+      ? `PING from @${me.handle}: ${note.trim()}`
+      : `PING from @${me.handle}: please relay sync (unread / reviews / handoffs).`;
+    return this.sendDm(me, handle, body, "ping");
+  }
+
+  sync(me: User) {
+    this.setStatus(me, "online", "sync");
+    const unread = this.inbox(me, { unread: true, limit: 30 });
+    const reviews = this.listReviews(me).filter((r) => r.verdict === "pending" && r.to === me.handle);
+    const handoffs = this.listHandoffs(me).filter((h) => h.status === "offered" && h.to === me.handle);
+    const people = this.people(me).map((p) => ({
+      handle: p.handle,
+      online: p.online,
+      status: p.status,
+      they_allow_you: p.they_allow_you,
+      you_allow_them: p.you_allow_them,
+    }));
+    return {
+      at: now(),
+      me: { handle: me.handle },
+      people,
+      unread,
+      reviews_waiting_on_you: reviews,
+      handoffs_waiting_on_you: handoffs,
+      how: [
+        unread.length ? "Ack unread after you handle them: relay ack <id>" : "Inbox clear",
+        reviews.length ? "Show review: relay review show <id> then verdict lgtm|changes" : "No reviews",
+        handoffs.length ? "Take handoff: relay handoff take <id> then work locally / gh" : "No handoffs",
+        "Stay live: relay status working <what>  ·  relay ping <handle>  ·  relay live",
+      ],
+    };
   }
 
   private systemMessage(fromId: string, toId: string, body: string) {
@@ -465,6 +503,7 @@ export class Store {
     roomId: string | null,
     body: string,
     kind: string,
+    replyTo?: string,
   ) {
     const text = body.trim();
     if (!text) throw new RelayError(400, "Message body is empty.");
@@ -476,13 +515,23 @@ export class Store {
       room_id: roomId,
       kind,
       body: text,
+      reply_to: replyTo ?? null,
       created_at: now(),
     };
     this.db
       .prepare(
-        "INSERT INTO messages (id, from_user, to_user, room_id, kind, body, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO messages (id, from_user, to_user, room_id, kind, body, reply_to, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       )
-      .run(msg.id, msg.from_user, msg.to_user, msg.room_id, msg.kind, msg.body, msg.created_at);
+      .run(
+        msg.id,
+        msg.from_user,
+        msg.to_user,
+        msg.room_id,
+        msg.kind,
+        msg.body,
+        msg.reply_to,
+        msg.created_at,
+      );
     const hydrated = this.hydrateMessage(msg as unknown as Record<string, unknown>, fromUser);
     const targets = [fromUser];
     if (toUser) targets.push(toUser);
@@ -540,6 +589,7 @@ export class Store {
       room: room?.slug ?? null,
       kind: String(r.kind ?? "chat"),
       body: String(r.body),
+      reply_to: r.reply_to ? String(r.reply_to) : null,
       created_at: Number(r.created_at),
       read,
     };

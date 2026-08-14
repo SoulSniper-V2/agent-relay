@@ -174,6 +174,11 @@ test("grants: review and handoff are denied until the other person allows them",
     const taken = store.updateHandoff(alice.user, hd.id, { status: "accepted" });
     assert.equal(taken.status, "accepted");
     store.pointPr(bob.user, "alice", "12", "look at auth");
+    const board = store.sync(alice.user);
+    assert.equal(board.handoffs_waiting_on_you.length, 0);
+    store.ping(alice.user, "bob", "check the PR");
+    const bobInbox = store.inbox(bob.user, { unread: true });
+    assert.equal(bobInbox.some((m) => m.kind === "ping"), true);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

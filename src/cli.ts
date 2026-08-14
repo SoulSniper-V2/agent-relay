@@ -40,6 +40,8 @@ Setup (agent-native)
   relay login <email>           Email a 6-digit code to the human
   relay verify <email> <code>   Finish login; saves RELAY_TOKEN
   relay whoami                  You + people + unread
+  relay sync                    One-shot live board (unread, reviews, handoffs, who's online)
+  relay ping <handle> [note]    Nudge the other agent to sync
   relay tokens [--name]         Mint another token for MCP / a cloud agent
 
 People
@@ -175,6 +177,20 @@ Env: RELAY_URL  RELAY_TOKEN  RELAY_CONFIG  RELAY_PORT  RELAY_DB
       return;
     }
 
+    if (cmd === "sync") {
+      const { api } = authed();
+      out(await api.request("GET", "/v1/sync"));
+      return;
+    }
+
+    if (cmd === "ping") {
+      const handle = argv[1]?.replace(/^@/, "");
+      if (!handle) fail("Usage: relay ping <handle> [note]");
+      const { api } = authed();
+      out(await api.request("POST", "/v1/ping", { to: handle, note: argv.slice(2).join(" ") }));
+      return;
+    }
+
     if (cmd === "whoami") {
       const { api } = authed();
       out(await api.request("GET", "/v1/me"));
@@ -204,14 +220,17 @@ Env: RELAY_URL  RELAY_TOKEN  RELAY_CONFIG  RELAY_PORT  RELAY_DB
 
     if (cmd === "send") {
       const target = argv[1];
-      const text = argv.slice(2).join(" ").replace(/^--body=/, "");
-      if (!target || !text) fail("Usage: relay send <handle|#room-slug> <message>");
+      const reply = flag(argv, "reply");
+      const text = argv.slice(2).filter((a) => !a.startsWith("--")).join(" ");
+      if (!target || !text) fail("Usage: relay send <handle|#room-slug> <message> [--reply msg_id]");
       const { api } = authed();
       if (target.startsWith("#")) {
-        out(await api.request("POST", "/v1/messages", { room: target.slice(1), body: text }));
+        out(await api.request("POST", "/v1/messages", { room: target.slice(1), body: text, reply_to: reply }));
       } else {
-        out(await api.request("POST", "/v1/messages", { to: target.replace(/^@/, ""), body: text }));
+        out(await api.request("POST", "/v1/messages", { to: target.replace(/^@/, ""), body: text, reply_to: reply }));
       }
+      return;
+    }
       return;
     }
 

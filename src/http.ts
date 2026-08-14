@@ -188,15 +188,29 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
         return;
       }
 
+      if (method === "GET" && p === "/v1/sync") {
+        send(res, 200, store.sync(need()));
+        return;
+      }
+
+      if (method === "POST" && p === "/v1/ping") {
+        const me = need();
+        const b = await jsonBody(req);
+        send(res, 201, store.ping(me, String(b.to ?? ""), String(b.note ?? "")));
+        return;
+      }
+
       if (method === "POST" && p === "/v1/messages") {
         const me = need();
         const b = await jsonBody(req);
         const body = String(b.body ?? "");
+        const reply = b.reply_to ? String(b.reply_to) : undefined;
+        const kind = b.kind ? String(b.kind) : "chat";
         if (b.room) {
-          send(res, 201, store.sendRoom(me, String(b.room), body));
+          send(res, 201, store.sendRoom(me, String(b.room), body, kind, reply));
           return;
         }
-        send(res, 201, store.sendDm(me, String(b.to ?? ""), body));
+        send(res, 201, store.sendDm(me, String(b.to ?? ""), body, kind, reply));
         return;
       }
 
