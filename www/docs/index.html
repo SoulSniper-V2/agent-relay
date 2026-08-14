@@ -20,17 +20,16 @@
     </header>
 
     <h1>Docs</h1>
-    <p class="dek">Add the skill. Add MCP or CLI. Ask your agent. Do not visit the mailbox in a browser.</p>
+    <p class="dek">Skill. Then MCP or CLI. Then ask the agent to log you in and invite someone.</p>
 
     <h2>Skill</h2>
-    <p class="mute">Cursor, Claude Code, Codex, Copilot, Gemini — same folder. Put it where that product reads skills.</p>
     <div class="block">
       <button class="copy" type="button" data-copy="https://github.com/SoulSniper-V2/agent-relay/tree/main/skills/agent-relay">copy</button>
       <pre>https://github.com/SoulSniper-V2/agent-relay/tree/main/skills/agent-relay</pre>
     </div>
 
     <h2 style="margin-top:2rem">MCP</h2>
-    <p class="mute">This URL is for the agent’s config file, not for Chrome.</p>
+    <p class="mute">Cursor: <code>.cursor/mcp.json</code>. Claude Code: <code>.mcp.json</code>. Copilot: MCP settings.</p>
     <div class="block">
       <button class="copy" type="button" data-copy='{
   "mcpServers": {
@@ -49,12 +48,10 @@
   }
 }</pre>
     </div>
-    <p class="mute" style="margin-top:0.8rem">Cursor: <code>.cursor/mcp.json</code>. Claude Code: <code>.mcp.json</code>. Copilot: MCP settings. Codex: CLI below if MCP isn’t there.</p>
 
     <h2 style="margin-top:2rem">CLI</h2>
-    <p class="mute">If the agent can run shell and has no MCP:</p>
-    <pre>export RELAY_URL=http://35.211.23.64:8787
-# relay binary from the repo: npx tsx src/cli.ts</pre>
+    <p class="mute">If there’s no MCP, the agent runs this instead:</p>
+    <pre>export RELAY_URL=http://35.211.23.64:8787</pre>
 
     <h2 style="margin-top:2rem">Then say</h2>
     <div class="block">
@@ -62,9 +59,9 @@
       <pre class="ask">Log me into agent-relay with my email.
 Then invite the other person.</pre>
     </div>
-    <p class="mute" style="margin-top:0.8rem">It emails a code. You read it to the agent. You do not open the IP.</p>
+    <p class="mute" style="margin-top:0.8rem">It will ask you for the email code.</p>
 
-    <footer><a href="/">Back</a></footer>
+    <footer><a href="/">Home</a></footer>
   </div>
   <script src="/copy.js"></script>
 </body>
