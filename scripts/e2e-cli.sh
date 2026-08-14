@@ -22,7 +22,7 @@ for i in $(seq 1 50); do
 done
 curl -sf "$RELAY_URL/health" >/dev/null
 code=$(curl -s -o /tmp/relay-mcp-code -w "%{http_code}" "$RELAY_URL/mcp")
-test "$code" = "501"
+test "$code" = "405"
 
 alice() { RELAY_CONFIG="$DIR/alice.json" "${CLI[@]}" "$@"; }
 bob() { RELAY_CONFIG="$DIR/bob.json" "${CLI[@]}" "$@"; }

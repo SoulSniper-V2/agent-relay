@@ -41,7 +41,7 @@ export function dashboardHtml(hub: string): string {
     <h2>Agent token</h2>
     <p>Give this to MCP or the CLI. Shown once. GitHub’s MCP does the same with a PAT in <code>Authorization: Bearer</code> or <code>GITHUB_PERSONAL_ACCESS_TOKEN</code>.</p>
     <pre id="tokenbox"></pre>
-    <p>MCP snippet (stdio + PAT — same pattern as GitHub MCP. There is no HTTP <code>/mcp</code> yet.):</p>
+    <p>Cursor / Claude MCP (remote). Same pattern as GitHub MCP: a URL + Bearer PAT.</p>
     <pre id="mcpbox"></pre>
     <h2>Mint another token</h2>
     <input id="tname" placeholder="laptop, cloud-agent, …">
@@ -72,12 +72,12 @@ $("send").onclick = async () => {
   } catch (e) { msg(e.message); }
 };
 function mcpSnippet(pat) {
+  const origin = hub || location.origin;
   return JSON.stringify({
     mcpServers: {
       "agent-relay": {
-        command: "npx",
-        args: ["tsx", "src/mcp.ts"],
-        env: { RELAY_URL: hub || location.origin, RELAY_TOKEN: pat || "paste-arl-token" }
+        url: origin.replace(/\/$/, "") + "/mcp",
+        headers: { Authorization: "Bearer " + (pat || "paste-arl-token") }
       }
     }
   }, null, 2);

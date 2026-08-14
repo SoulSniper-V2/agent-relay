@@ -79,6 +79,6 @@ Imperative, one concern per commit. No secrets in history.
 ## Do not
 
 - Implement remote shell into someone else's machine
-- Pretend `/mcp` Streamable HTTP OAuth is done (stdio MCP + PAT is the real path)
+- Pretend OAuth browser login for MCP is done (PAT in Authorization: Bearer is the real path, same as GitHub MCP)
 - Deploy (`fly deploy`) unless the human explicitly asked
 - Log OTP codes or `arl_` tokens

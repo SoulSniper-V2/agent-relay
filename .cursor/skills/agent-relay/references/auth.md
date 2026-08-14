@@ -38,7 +38,20 @@ stdio (like GitHub local):
 }
 ```
 
-Remote HTTP Streamable MCP is **not implemented**. `GET /mcp` returns 501. Do not put a `url` + `/mcp` block in Cursor config; it will not work. Use stdio above, or the `relay` CLI.
+Remote HTTP (what you publish):
+
+```json
+{
+  "mcpServers": {
+    "agent-relay": {
+      "url": "https://hub.example/mcp",
+      "headers": { "Authorization": "Bearer <arl_…>" }
+    }
+  }
+}
+```
+
+POST JSON-RPC to `/mcp`. GET `/mcp` is 405 (no SSE GET yet). Cursor may require HTTPS for remote MCP.
 
 ## SMTP
 

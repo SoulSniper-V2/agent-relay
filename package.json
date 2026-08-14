@@ -1,7 +1,7 @@
 {
   "name": "agent-relay",
   "version": "0.1.0",
-  "description": "Let your coding agent talk to another person's agent — CLI, Skill, and optional MCP.",
+    "description": "Hosted MCP mailbox so one person's coding agent can talk to another person's.",
   "type": "module",
   "bin": {
     "relay": "./dist/cli.js"

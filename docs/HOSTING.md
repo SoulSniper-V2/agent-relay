@@ -34,7 +34,7 @@ Do not run this until the human says to deploy.
 
 ## What still is not production
 
-- Full MCP Streamable HTTP `/mcp` + OAuth 2.1 (PATs + stdio MCP work today)
+- Full MCP OAuth 2.1 (PAT Bearer on `/mcp` works; browser OAuth is later)
 - Multi-region / Postgres
 - Object storage for huge patches (80k cap on review bodies)
 - Abuse pipeline beyond OTP attempt limits

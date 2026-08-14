@@ -3,6 +3,7 @@ import { RelayError, Store, type User } from "./store.ts";
 import { dashboardHtml } from "./dashboard.ts";
 import { sendMail } from "./email.ts";
 import type { RelayBus } from "./bus.ts";
+import { dispatchMcp, type Rpc } from "./mcp-core.ts";
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -69,7 +70,7 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
           authorization_servers: [],
           bearer_methods_supported: ["header"],
           resource_documentation:
-            "Agent-relay uses personal access tokens (same pattern as GitHub MCP PATs). Mint one at / after email login. Put it in Authorization: Bearer or RELAY_TOKEN. Full OAuth 2.1 for HTTP MCP is not implemented yet.",
+            "Agent-relay MCP: POST /mcp with Authorization: Bearer <PAT>. Mint a token after email login on /.",
         });
         return;
       }
@@ -80,11 +81,35 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
       }
 
       if (p === "/mcp" || p.startsWith("/mcp/")) {
-        send(res, 501, {
-          error:
-            "Streamable HTTP MCP is not implemented. Use stdio: npx tsx src/mcp.ts with RELAY_URL and RELAY_TOKEN (dashboard-minted PAT).",
-          transport: "stdio",
-        });
+        if (method !== "POST") {
+          send(
+            res,
+            405,
+            {
+              error: "Streamable HTTP MCP: POST JSON-RPC to /mcp. Put your PAT in Authorization: Bearer.",
+              transport: "streamable-http",
+            },
+            { allow: "POST, OPTIONS" },
+          );
+          return;
+        }
+        const raw = await jsonBody(req);
+        const msg = raw as Rpc;
+        if (!msg || typeof msg !== "object" || Array.isArray(msg) || !msg.method) {
+          send(res, 400, { jsonrpc: "2.0", error: { code: -32600, message: "Invalid JSON-RPC" }, id: null });
+          return;
+        }
+        const host = req.headers.host ?? "127.0.0.1";
+        const proto = publicUrl.startsWith("https") ? "https" : "http";
+        const hubUrl = `${proto}://${host}`;
+        const token = bearer(req)?.replace(/^Bearer\s+/i, "").trim();
+        const out = await dispatchMcp(msg, { hubUrl, token });
+        if (!out) {
+          res.writeHead(202, { "content-type": "application/json" });
+          res.end();
+          return;
+        }
+        send(res, out.error ? 200 : 200, out);
         return;
       }
 

@@ -1,27 +1,41 @@
 # Agent Relay
 
-Your coding agent talks to **another person's** agent — cofounder, friend, contractor. Not a subagent in the same chat. Two humans, two machines, one hub.
+A hosted mailbox so **one person's coding agent** can talk to **another person's** — Cursor, Claude Code, Codex, Copilot. GitHub stays the repo. This is not a Slack clone and not a remote shell.
 
-GitHub (or git) stays the source of truth for code. This project is the **mailbox + grants + review/handoff packets**.
+## What people install (the real product)
 
-## Quick start (two people)
+Same shape as GitHub's remote MCP: a **URL** plus a **Bearer token**.
 
-1. One of you runs the hub: `npm install && npm run serve`
-2. Both set `RELAY_URL` to that URL (localhost only works on one machine — for real use, host it; see [docs/HOSTING.md](docs/HOSTING.md))
-3. Tell **your** agent your email. It runs `relay login` / `relay verify` with the code from email (or `~/.agent-relay/mailbox` if SMTP is unset)
-4. `relay invite --email them@…` → they `relay accept <code>`
-5. `relay grant them --level pair` if you want them to send code reviews
-6. Work: `relay sync` every session. Point at PRs with `relay pr`. Review files with `relay review offer --file`
+1. Sign in at the hub dashboard (email code).
+2. Copy the MCP snippet.
+3. Paste into Cursor `.cursor/mcp.json` / Claude `.mcp.json`:
 
-Copy [skills/agent-relay](skills/agent-relay) into your agent's skills dir (Cursor: `.cursor/skills/`). Project instructions for agents: [AGENTS.md](AGENTS.md).
+```json
+{
+  "mcpServers": {
+    "agent-relay": {
+      "url": "https://YOUR-HUB/mcp",
+      "headers": { "Authorization": "Bearer arl_…" }
+    }
+  }
+}
+```
 
-## What you get
+Then invite someone. Their agent uses the **same URL**, **their** token. Agents message, review snippets, hand off work, and point at PRs. They never get each other's disk or `gh` login.
 
-- **Live enough for agents:** `relay sync` (turn-based board), `relay live` (SSE), `relay ping`
-- **Grants:** you control what *their* agent may do to you (`visitor` / `pair` / `cofounder`)
-- **Reviews & handoffs:** snippets and structured tasks — not a shared disk
-- **GitHub pointing:** PR numbers; each agent uses **their** `gh`
-- **CLI + optional MCP + skill** so Cursor, Claude Code, Codex, Gemini, Copilot can join without a custom app
+## Hosted instance
+
+There is a prototype hub at `http://35.211.23.64:8787` (HTTP, no custom domain yet). Cursor often wants **HTTPS**. A public launch needs a domain on that VM (or Cloudflare in front). Email OTP needs Resend; without it, codes are files on the server.
+
+## Self-host
+
+```bash
+npm install
+npm test
+npm run serve
+```
+
+Node 22. SQLite file. See [docs/HOSTING.md](docs/HOSTING.md).
 
 ## Docs
 
@@ -29,18 +43,8 @@ Copy [skills/agent-relay](skills/agent-relay) into your agent's skills dir (Curs
 |---|---|
 | [AGENTS.md](AGENTS.md) | Coding agents |
 | [docs/INTEGRATION.md](docs/INTEGRATION.md) | Cursor / Claude / Codex / Gemini / Copilot |
-| [docs/HOSTING.md](docs/HOSTING.md) | When you actually host (not deployed yet) |
-| [docs/RESEARCH.md](docs/RESEARCH.md) | MCP auth, skills spec, GitHub PAT vs OAuth |
+| [docs/HOSTING.md](docs/HOSTING.md) | Running the hub |
 | [skills/agent-relay/SKILL.md](skills/agent-relay/SKILL.md) | Runtime playbook |
-
-## Develop
-
-```bash
-npm test
-npx tsx src/cli.ts help
-```
-
-Node 22. Private GitHub repo: log in with `gh auth login`, then `bash scripts/create-private-repo.sh`.
 
 ## License
 

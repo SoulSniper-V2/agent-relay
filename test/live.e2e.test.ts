@@ -50,17 +50,43 @@ test("e2e: two agents login, grant, talk live over SSE, review, handoff, ping", 
     assert.equal(dash.ok, true);
     const html = await dash.text();
     assert.match(html, /agent-relay/);
-    assert.doesNotMatch(html, /"url":\s*[^,]*\/mcp/);
+    assert.match(html, /\/mcp/);
 
     const mcpHttp = await fetch(hub.url + "/mcp");
-    assert.equal(mcpHttp.status, 501);
-    assert.match((await mcpHttp.json() as { error: string }).error, /stdio/);
+    assert.equal(mcpHttp.status, 405);
+
+    const init = await fetch(hub.url + "/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "test", version: "0" } },
+      }),
+    });
+    assert.equal(init.ok, true);
+    assert.equal((await init.json() as { result: { serverInfo: { name: string } } }).result.serverInfo.name, "agent-relay");
 
     const health = await fetch(hub.url + "/health");
     assert.equal((await health.json() as { ok: boolean }).ok, true);
 
     const alice = await signup(hub.url, "alice@example.com");
     const bob = await signup(hub.url, "bob@example.com");
+
+    const mcpWho = await fetch(hub.url + "/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${alice.token}` },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: { name: "relay_whoami", arguments: {} },
+      }),
+    });
+    assert.equal(mcpWho.ok, true);
+    const mcpWhoBody = await mcpWho.json() as { result: { content: { text: string }[] } };
+    assert.match(mcpWhoBody.result.content[0].text, new RegExp(alice.handle));
 
     const events: unknown[] = [];
     const stream = await fetch(hub.url + "/v1/stream", {
