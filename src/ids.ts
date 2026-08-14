@@ -12,6 +12,11 @@ export function token(): string {
   return `arl_${randomBytes(24).toString("hex")}`;
 }
 
+export function otp(): string {
+  const n = randomBytes(4).readUInt32BE(0) % 1_000_000;
+  return n.toString().padStart(6, "0");
+}
+
 export function hashToken(t: string): string {
   return createHash("sha256").update(t).digest("hex");
 }

@@ -19,7 +19,7 @@ function client() {
 
 function authed() {
   const c = client();
-  if (!c.cfg.token) fail("Not signed in. Run: relay signup <handle>");
+  if (!c.cfg.token) fail("Not signed in. Run: relay login you@email.com");
   return c;
 }
 
@@ -34,13 +34,15 @@ async function main() {
   if (!cmd || cmd === "help" || cmd === "-h" || cmd === "--help") {
     process.stdout.write(`agent-relay — your agent talks to another person's agent
 
-Setup
-  relay serve [--port=8787]     Start the shared hub (one per friend group)
-  relay signup <handle>         Create your identity on the hub
+Setup (agent-native)
+  relay serve [--port=8787]     Start the shared hub
+  relay login <email>           Email a 6-digit code to the human
+  relay verify <email> <code>   Finish login; saves RELAY_TOKEN
   relay whoami                  You + people + unread
+  relay tokens [--name]         Mint another token for MCP / a cloud agent
 
 People
-  relay invite                  Mint a code to text a friend
+  relay invite [--email addr]   Mint a code; optionally email it
   relay accept <code>           Connect to whoever invited you
   relay people                  Who you can talk to
 
@@ -88,9 +90,52 @@ Env: RELAY_URL  RELAY_TOKEN  RELAY_CONFIG  RELAY_PORT  RELAY_DB
       return;
     }
 
+    if (cmd === "login") {
+      const email = argv[1];
+      if (!email) fail("Usage: relay login <email>");
+      const { cfg, api } = client();
+      const res = await api.request<Record<string, unknown>>("POST", "/v1/auth/request", { email });
+      saveConfig({ ...cfg, handle: cfg.handle, url: cfg.url });
+      out({
+        next: "Ask the human for the 6-digit code from email, then: relay verify <email> <code>",
+        ...res,
+      });
+      return;
+    }
+
+    if (cmd === "verify") {
+      const email = argv[1];
+      const code = argv[2];
+      if (!email || !code) fail("Usage: relay verify <email> <code>");
+      const { cfg, api } = client();
+      const res = await api.request<{ user: { handle: string; email?: string }; token: string }>(
+        "POST",
+        "/v1/auth/verify",
+        { email, code },
+      );
+      saveConfig({ url: cfg.url, handle: res.user.handle, token: res.token });
+      out({
+        ok: true,
+        handle: res.user.handle,
+        saved: "token written to RELAY_CONFIG — do not print this token into git",
+      });
+      return;
+    }
+
+    if (cmd === "tokens") {
+      const { api } = authed();
+      const name = flag(argv, "name");
+      if (name || argv.includes("--mint")) {
+        out(await api.request("POST", "/v1/tokens", { name: name ?? "agent" }));
+        return;
+      }
+      out(await api.request("GET", "/v1/tokens"));
+      return;
+    }
+
     if (cmd === "signup") {
       const handle = argv[1];
-      if (!handle) fail("Usage: relay signup <handle>");
+      if (!handle) fail("Usage: relay signup <handle>  (prefer: relay login <email>)");
       const name = flag(argv, "name") ?? handle;
       const { cfg, api } = client();
       const res = await api.request<{ user: { handle: string; name: string }; token: string }>(
@@ -111,7 +156,8 @@ Env: RELAY_URL  RELAY_TOKEN  RELAY_CONFIG  RELAY_PORT  RELAY_DB
 
     if (cmd === "invite") {
       const { api } = authed();
-      out(await api.request("POST", "/v1/invites", {}));
+      const email = flag(argv, "email");
+      out(await api.request("POST", "/v1/invites", email ? { email } : {}));
       return;
     }
 

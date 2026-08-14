@@ -75,6 +75,32 @@ export function openDb(path: string): DatabaseSync {
       updated_by TEXT NOT NULL,
       updated_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS login_codes (
+      email TEXT PRIMARY KEY,
+      code_hash TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS agent_tokens (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      token_hash TEXT UNIQUE NOT NULL,
+      created_at INTEGER NOT NULL,
+      last_used INTEGER,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
   `);
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN email TEXT");
+  } catch {
+    /* already migrated */
+  }
+  try {
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users(email) WHERE email IS NOT NULL");
+  } catch {
+    /* ignore */
+  }
   return db;
 }

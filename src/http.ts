@@ -1,5 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { RelayError, Store, type User } from "./store.ts";
+import { dashboardHtml } from "./dashboard.ts";
+import { sendMail } from "./email.ts";
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -20,13 +22,14 @@ async function jsonBody(req: IncomingMessage): Promise<Record<string, unknown>> 
   }
 }
 
-function send(res: ServerResponse, status: number, data: unknown) {
+function send(res: ServerResponse, status: number, data: unknown, extra: Record<string, string> = {}) {
   const body = JSON.stringify(data, null, 2);
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": "*",
     "access-control-allow-headers": "authorization, content-type",
-    "access-control-allow-methods": "GET,POST,PATCH,OPTIONS",
+    "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
+    ...extra,
   });
   res.end(body);
 }
@@ -52,8 +55,64 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string } = {
       const p = url.pathname.replace(/\/$/, "") || "/";
       const method = req.method ?? "GET";
 
+      if (method === "GET" && (p === "/" || p === "/app")) {
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(dashboardHtml(publicUrl));
+        return;
+      }
+
+      if (method === "GET" && p === "/.well-known/oauth-protected-resource") {
+        send(res, 200, {
+          resource: publicUrl || "http://127.0.0.1:8787",
+          authorization_servers: [],
+          bearer_methods_supported: ["header"],
+          resource_documentation:
+            "Agent-relay uses personal access tokens (same pattern as GitHub MCP PATs). Mint one at / after email login. Put it in Authorization: Bearer or RELAY_TOKEN. Full OAuth 2.1 for HTTP MCP is not implemented yet.",
+        });
+        return;
+      }
+
       if (method === "GET" && p === "/health") {
         send(res, 200, { ok: true, name: "agent-relay" });
+        return;
+      }
+
+      if (method === "POST" && p === "/v1/auth/request") {
+        const b = await jsonBody(req);
+        const issued = store.createLoginCode(String(b.email ?? ""));
+        const delivered = await sendMail({
+          to: issued.email,
+          subject: `Your agent-relay code: ${issued.code}`,
+          text: [
+            `Your login code is: ${issued.code}`,
+            "",
+            "Give this code to your agent (or paste it on the dashboard).",
+            "It expires in 10 minutes. Do not forward it.",
+            publicUrl ? `Dashboard: ${publicUrl}` : "",
+          ].join("\n"),
+        });
+        const payload: Record<string, unknown> = {
+          ok: true,
+          email: issued.email,
+          delivered: delivered.delivered,
+          expires_in_sec: 600,
+          hint:
+            delivered.delivered === "file"
+              ? "No SMTP configured. Code written to RELAY_MAILBOX_DIR (default ~/.agent-relay/mailbox). Ask the human to read that email/file and tell you the 6-digit code."
+              : "Code emailed. Ask the human to read their inbox and tell you the 6-digit code. Do not guess.",
+        };
+        if (process.env.RELAY_DEV_OTP === "1") payload.dev_code = issued.code;
+        send(res, 200, payload);
+        return;
+      }
+
+      if (method === "POST" && p === "/v1/auth/verify") {
+        const b = await jsonBody(req);
+        const result = store.verifyLogin(String(b.email ?? ""), String(b.code ?? ""));
+        send(res, 200, {
+          ...result,
+          hint: "Save token as RELAY_TOKEN. Do not commit it. Mint extra tokens on the dashboard for MCP/cloud agents.",
+        });
         return;
       }
 
@@ -78,11 +137,30 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string } = {
 
       if (method === "POST" && p === "/v1/invites") {
         const me = need();
+        const b = await jsonBody(req);
         const inv = store.createInvite(me);
+        const email = b.email ? String(b.email) : "";
+        if (email) {
+          await sendMail({
+            to: email,
+            subject: `@${me.handle} invited your agent to agent-relay`,
+            text: [
+              `@${me.handle} wants your agents to talk.`,
+              "",
+              `1. Open ${publicUrl || "the hub"} or tell your agent: relay login ${email}`,
+              `2. After login: relay accept ${inv.code}`,
+              "",
+              `Invite code: ${inv.code}`,
+            ].join("\n"),
+          });
+        }
         send(res, 201, {
           ...inv,
+          emailed: email || undefined,
           accept: `relay accept ${inv.code}`,
-          hint: "Send this code to a friend. They run the same hub URL, signup, then accept.",
+          hint: email
+            ? `Emailed ${email}. They log in, then relay accept ${inv.code}.`
+            : "Send this code to a friend. They log in on the same hub, then accept.",
           hub: publicUrl || undefined,
         });
         return;
@@ -188,10 +266,28 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string } = {
         return;
       }
 
+      if (method === "GET" && p === "/v1/tokens") {
+        send(res, 200, { tokens: store.listTokens(need()) });
+        return;
+      }
+
+      if (method === "POST" && p === "/v1/tokens") {
+        const me = need();
+        const b = await jsonBody(req);
+        send(res, 201, store.issueToken(me, String(b.name ?? "agent")));
+        return;
+      }
+
+      if (method === "DELETE" && p.startsWith("/v1/tokens/")) {
+        send(res, 200, store.revokeToken(need(), p.split("/")[3]));
+        return;
+      }
+
       send(res, 404, { error: "Not found" });
     } catch (e) {
       if (e instanceof RelayError) {
-        send(res, e.status, { error: e.message });
+        const extra = e.status === 401 ? { "www-authenticate": 'Bearer realm="agent-relay"' } : {};
+        send(res, e.status, { error: e.message }, extra);
         return;
       }
       console.error(e);

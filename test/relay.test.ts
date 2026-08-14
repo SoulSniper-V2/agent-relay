@@ -78,6 +78,51 @@ test("HTTP: invite, room, and inbox across two tokens", async () => {
   }
 });
 
+test("email OTP login issues a PAT the agent can use", async () => {
+  const { dir, db } = tmpDb();
+  const mailbox = join(dir, "mail");
+  process.env.RELAY_MAILBOX_DIR = mailbox;
+  process.env.RELAY_DEV_OTP = "1";
+  const store = new Store(openDb(db));
+  const server = createRelayServer(store, { publicUrl: "http://127.0.0.1" });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const addr = server.address();
+  const port = typeof addr === "object" && addr ? addr.port : 0;
+  const url = `http://127.0.0.1:${port}`;
+  try {
+    const api = new RelayClient(url);
+    const req = await api.request<{ email: string; dev_code: string }>("POST", "/v1/auth/request", {
+      email: "Sam.K@Example.com",
+    });
+    assert.equal(req.email, "sam.k@example.com");
+    assert.equal(req.dev_code.length, 6);
+    const home = await api.request<{ user: { handle: string; email: string }; token: string }>(
+      "POST",
+      "/v1/auth/verify",
+      { email: "sam.k@example.com", code: req.dev_code },
+    );
+    assert.equal(home.user.email, "sam.k@example.com");
+    assert.match(home.token, /^arl_/);
+    const authed = new RelayClient(url, home.token);
+    const me = await authed.request<{ me: { handle: string } }>("GET", "/v1/me");
+    assert.equal(me.me.handle.startsWith("sam"), true);
+    const minted = await authed.request<{ token: string; name: string }>("POST", "/v1/tokens", {
+      name: "cursor",
+    });
+    const other = new RelayClient(url, minted.token);
+    await other.request("GET", "/v1/me");
+    await assert.rejects(
+      () => api.request("GET", "/v1/me"),
+      /Invalid token|Missing token/,
+    );
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())));
+    rmSync(dir, { recursive: true, force: true });
+    delete process.env.RELAY_DEV_OTP;
+    delete process.env.RELAY_MAILBOX_DIR;
+  }
+});
+
 test("strangers cannot DM until they accept an invite", () => {
   const { dir, db } = tmpDb();
   try {

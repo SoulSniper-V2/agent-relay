@@ -2,7 +2,9 @@
 
 Let **your** coding agent talk to **another person's** agent — a friend, cofounder, or contractor. Not another subagent in the same chat. Two humans, two machines, one hub.
 
-There is no required dashboard. You ask your agent: *invite Maya*, *tell her agent we own webhooks*, *what did their agent remember about auth?* The skill plus CLI (or MCP) does the rest.
+Agent-first: you say *invite Maya*, *log me in*, *tell her agent we own webhooks*. The skill plus CLI (or MCP) does it. There is a **small dashboard** at `/` only to mint extra tokens and glance at people — GitHub’s MCP uses the same PAT-on-a-website pattern.
+
+Auth research (MCP spec, GitHub MCP, Agent Skills spec) is in [docs/RESEARCH.md](docs/RESEARCH.md). Short version: email OTP for the human, personal access tokens for agents, OAuth 2.1 later for hosted Streamable HTTP.
 
 ## MCP vs CLI vs Skill (what we chose)
 
@@ -38,17 +40,22 @@ Claude Code: copy to `~/.claude/skills/agent-relay/`.
 **You**
 
 ```bash
-npm run serve          # hub at http://127.0.0.1:8787
+npm run serve
 export RELAY_URL=http://127.0.0.1:8787
-npx tsx src/cli.ts signup sam
-npx tsx src/cli.ts invite     # send the code to your friend
+# tell your agent your email, or:
+npx tsx src/cli.ts login you@example.com
+npx tsx src/cli.ts verify you@example.com 123456
+npx tsx src/cli.ts invite --email friend@example.com
 ```
+
+Open `http://127.0.0.1:8787` to mint a token for MCP. Without `RELAY_RESEND_KEY`, codes land in `~/.agent-relay/mailbox/`.
 
 **Friend** (same `RELAY_URL`, reachable from their machine)
 
 ```bash
-npx tsx src/cli.ts signup maya
-npx tsx src/cli.ts accept <code>
+npx tsx src/cli.ts login friend@example.com
+npx tsx src/cli.ts verify friend@example.com <code>
+npx tsx src/cli.ts accept <invite-code>
 ```
 
 Then either agent:
@@ -64,13 +71,13 @@ Tell your agent in chat: *check relay inbox* or *message Maya's agent*. The skil
 
 ## MCP (optional)
 
-After `relay signup`, put your token in [examples/mcp.json](examples/mcp.json) and merge it into `.cursor/mcp.json` or Claude Code MCP config. Tools are `relay_invite`, `relay_send`, `relay_inbox`, `relay_remember`, `relay_plan_*`, etc.
+After `relay login` / `relay verify` (or a token from `/`), put `RELAY_TOKEN` in [examples/mcp.json](examples/mcp.json).
 
 ## What is in / not in
 
-**In:** people + invites, DMs, project rooms, shared memory, joint plans, unread inbox, CLI, MCP, skill. Agent-first (you talk to *your* agent).
+**In:** email OTP login, dashboard token minting, people + invites, DMs, rooms, shared memory, joint plans, CLI, MCP, skill.
 
-**Not in:** remote shell into someone else's laptop, a social network, a new protocol, a required web UI. Cloud/background agents work if they have `RELAY_URL` + `RELAY_TOKEN` and can reach the hub.
+**Not in yet:** full MCP OAuth 2.1 / Streamable HTTP `/mcp` browser login (PATs match GitHub-in-Cursor today). No remote shell into someone else's machine.
 
 ## Tests
 

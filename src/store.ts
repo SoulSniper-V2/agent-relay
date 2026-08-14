@@ -6,14 +6,17 @@ import {
   inviteCode,
   now,
   normalizeHandle,
+  otp,
   roomScope,
   token,
 } from "./ids.ts";
+import { normalizeEmail } from "./email.ts";
 
 export type User = {
   id: string;
   handle: string;
   name: string;
+  email: string | null;
   last_seen: number | null;
   created_at: number;
 };
@@ -23,6 +26,7 @@ function rowUser(r: Record<string, unknown>): User {
     id: String(r.id),
     handle: String(r.handle),
     name: String(r.name),
+    email: r.email == null || r.email === "" ? null : String(r.email),
     last_seen: r.last_seen == null ? null : Number(r.last_seen),
     created_at: Number(r.created_at),
   };
@@ -46,15 +50,16 @@ export class Store {
       id: id("usr"),
       handle: h,
       name: (name ?? h).trim() || h,
+      email: null,
       last_seen: now(),
       created_at: now(),
     };
     try {
       this.db
         .prepare(
-          "INSERT INTO users (id, handle, name, token_hash, last_seen, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+          "INSERT INTO users (id, handle, name, token_hash, last_seen, created_at, email) VALUES (?, ?, ?, ?, ?, ?, ?)",
         )
-        .run(user.id, user.handle, user.name, hashToken(t), user.last_seen, user.created_at);
+        .run(user.id, user.handle, user.name, hashToken(t), user.last_seen, user.created_at, null);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("UNIQUE")) throw new RelayError(409, `Handle @${h} is taken.`);
@@ -64,14 +69,135 @@ export class Store {
   }
 
   auth(rawToken: string | undefined): User {
-    if (!rawToken) throw new RelayError(401, "Missing token. Run `relay signup` or set RELAY_TOKEN.");
+    if (!rawToken) throw new RelayError(401, "Missing token. Run `relay login <email>` or set RELAY_TOKEN.");
     const t = rawToken.replace(/^Bearer\s+/i, "").trim();
-    const row = this.db
-      .prepare("SELECT * FROM users WHERE token_hash = ?")
-      .get(hashToken(t)) as Record<string, unknown> | undefined;
+    const hashed = hashToken(t);
+    const viaPat = this.db
+      .prepare(
+        `SELECT u.* FROM agent_tokens a JOIN users u ON u.id = a.user_id WHERE a.token_hash = ?`,
+      )
+      .get(hashed) as Record<string, unknown> | undefined;
+    if (viaPat) {
+      this.db.prepare("UPDATE agent_tokens SET last_used = ? WHERE token_hash = ?").run(now(), hashed);
+      this.db.prepare("UPDATE users SET last_seen = ? WHERE id = ?").run(now(), viaPat.id);
+      return rowUser(viaPat);
+    }
+    const row = this.db.prepare("SELECT * FROM users WHERE token_hash = ?").get(hashed) as
+      | Record<string, unknown>
+      | undefined;
     if (!row) throw new RelayError(401, "Invalid token.");
     this.db.prepare("UPDATE users SET last_seen = ? WHERE id = ?").run(now(), row.id);
     return rowUser(row);
+  }
+
+  createLoginCode(emailRaw: string): { email: string; code: string; expires_at: number } {
+    let email: string;
+    try {
+      email = normalizeEmail(emailRaw);
+    } catch (e) {
+      throw new RelayError(400, e instanceof Error ? e.message : "Invalid email");
+    }
+    const recent = this.db.prepare("SELECT created_at FROM login_codes WHERE email = ?").get(email) as
+      | { created_at: number }
+      | undefined;
+    if (recent && now() - Number(recent.created_at) < 15_000) {
+      throw new RelayError(429, "Wait a few seconds before requesting another code.");
+    }
+    const code = otp();
+    const expires_at = now() + 10 * 60 * 1000;
+    this.db
+      .prepare(
+        `INSERT INTO login_codes (email, code_hash, expires_at, attempts, created_at)
+         VALUES (?, ?, ?, 0, ?)
+         ON CONFLICT(email) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at, attempts = 0, created_at = excluded.created_at`,
+      )
+      .run(email, hashToken(code), expires_at, now());
+    return { email, code, expires_at };
+  }
+
+  verifyLogin(emailRaw: string, codeRaw: string): { user: User; token: string; is_new: boolean } {
+    let email: string;
+    try {
+      email = normalizeEmail(emailRaw);
+    } catch (e) {
+      throw new RelayError(400, e instanceof Error ? e.message : "Invalid email");
+    }
+    const code = codeRaw.trim().replace(/\s/g, "");
+    const row = this.db.prepare("SELECT * FROM login_codes WHERE email = ?").get(email) as
+      | Record<string, unknown>
+      | undefined;
+    if (!row) throw new RelayError(400, "No login in progress. Ask your agent to request a new code.");
+    if (Number(row.expires_at) < now()) throw new RelayError(400, "Code expired. Request a new one.");
+    if (Number(row.attempts) >= 5) throw new RelayError(429, "Too many tries. Request a new code.");
+    this.db.prepare("UPDATE login_codes SET attempts = attempts + 1 WHERE email = ?").run(email);
+    if (hashToken(code) !== String(row.code_hash)) {
+      throw new RelayError(400, "Wrong code. Check the email and try again.");
+    }
+    this.db.prepare("DELETE FROM login_codes WHERE email = ?").run(email);
+    let existing = this.db.prepare("SELECT * FROM users WHERE email = ?").get(email) as
+      | Record<string, unknown>
+      | undefined;
+    let is_new = false;
+    if (!existing) {
+      is_new = true;
+      const handle = this.uniqueHandle(email.split("@")[0] ?? "user");
+      const created = this.register(handle, handle);
+      this.db.prepare("UPDATE users SET email = ? WHERE id = ?").run(email, created.user.id);
+      existing = this.db.prepare("SELECT * FROM users WHERE id = ?").get(created.user.id) as Record<
+        string,
+        unknown
+      >;
+    }
+    const user = rowUser(existing);
+    const issued = this.issueToken(user, "login");
+    return { user, token: issued.token, is_new };
+  }
+
+  private uniqueHandle(raw: string): string {
+    let base = raw.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "user";
+    if (base.length < 2) base = `u${base}`;
+    base = base.slice(0, 24);
+    try {
+      normalizeHandle(base);
+    } catch {
+      base = "user";
+    }
+    let candidate = base;
+    let i = 0;
+    while (this.db.prepare("SELECT 1 FROM users WHERE handle = ?").get(candidate)) {
+      i += 1;
+      candidate = `${base}${i}`;
+    }
+    return candidate;
+  }
+
+  issueToken(me: User, name: string): { id: string; name: string; token: string } {
+    const t = token();
+    const tid = id("tok");
+    const label = (name.trim() || "agent").slice(0, 40);
+    this.db
+      .prepare(
+        "INSERT INTO agent_tokens (id, user_id, name, token_hash, created_at) VALUES (?, ?, ?, ?, ?)",
+      )
+      .run(tid, me.id, label, hashToken(t), now());
+    return { id: tid, name: label, token: t };
+  }
+
+  listTokens(me: User) {
+    return this.db
+      .prepare(
+        "SELECT id, name, created_at, last_used FROM agent_tokens WHERE user_id = ? ORDER BY created_at DESC",
+      )
+      .all(me.id) as { id: string; name: string; created_at: number; last_used: number | null }[];
+  }
+
+  revokeToken(me: User, tokenId: string) {
+    const existed = this.db
+      .prepare("SELECT id FROM agent_tokens WHERE id = ? AND user_id = ?")
+      .get(tokenId, me.id);
+    if (!existed) throw new RelayError(404, "Token not found.");
+    this.db.prepare("DELETE FROM agent_tokens WHERE id = ? AND user_id = ?").run(tokenId, me.id);
+    return { ok: true };
   }
 
   getUserByHandle(handle: string): User | undefined {

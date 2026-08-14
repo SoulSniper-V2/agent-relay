@@ -12,14 +12,36 @@ type Rpc = { jsonrpc: "2.0"; id?: number | string; method?: string; params?: Rec
 
 const tools = [
   {
+    name: "relay_login_request",
+    description:
+      "Start agent-native login: email a 6-digit code to the human. Then ask them for the code and call relay_login_verify. Never invent a code.",
+    inputSchema: {
+      type: "object",
+      properties: { email: { type: "string" } },
+      required: ["email"],
+    },
+  },
+  {
+    name: "relay_login_verify",
+    description: "Finish login with the 6-digit code the human read from email. Saves nothing; returns a token for RELAY_TOKEN.",
+    inputSchema: {
+      type: "object",
+      properties: { email: { type: "string" }, code: { type: "string" } },
+      required: ["email", "code"],
+    },
+  },
+  {
     name: "relay_whoami",
     description: "Show your agent-relay identity, connected people, rooms, and unread messages.",
     inputSchema: { type: "object", properties: {} },
   },
   {
     name: "relay_invite",
-    description: "Create an invite code so another person can connect their agent to yours.",
-    inputSchema: { type: "object", properties: {} },
+    description: "Create an invite code so another person can connect their agent to yours. Optional email sends them the code.",
+    inputSchema: {
+      type: "object",
+      properties: { email: { type: "string" } },
+    },
   },
   {
     name: "relay_accept",
@@ -146,50 +168,55 @@ const tools = [
   },
 ];
 
-function api() {
+function api(requireToken = true) {
   const cfg = loadConfig();
-  if (!cfg.token) throw new Error("Not signed in. Run `relay signup <handle>` first.");
+  if (requireToken && !cfg.token) {
+    throw new Error("Not signed in. Call relay_login_request then relay_login_verify, or run `relay login`.");
+  }
   return new RelayClient(cfg.url, cfg.token);
 }
 
 async function callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
-  const c = api();
   switch (name) {
+    case "relay_login_request":
+      return api(false).request("POST", "/v1/auth/request", { email: args.email });
+    case "relay_login_verify":
+      return api(false).request("POST", "/v1/auth/verify", { email: args.email, code: args.code });
     case "relay_whoami":
-      return c.request("GET", "/v1/me");
+      return api().request("GET", "/v1/me");
     case "relay_invite":
-      return c.request("POST", "/v1/invites", {});
+      return api().request("POST", "/v1/invites", args.email ? { email: args.email } : {});
     case "relay_accept":
-      return c.request("POST", "/v1/invites/accept", { code: args.code });
+      return api().request("POST", "/v1/invites/accept", { code: args.code });
     case "relay_people":
-      return c.request("GET", "/v1/people");
+      return api().request("GET", "/v1/people");
     case "relay_send":
-      return c.request("POST", "/v1/messages", {
+      return api().request("POST", "/v1/messages", {
         to: args.to,
         room: args.room,
         body: args.body,
       });
     case "relay_inbox":
-      return c.request("GET", `/v1/inbox${args.unread ? "?unread=1" : ""}`);
+      return api().request("GET", `/v1/inbox${args.unread ? "?unread=1" : ""}`);
     case "relay_ack":
-      return c.request("POST", `/v1/messages/${args.id}/ack`);
+      return api().request("POST", `/v1/messages/${args.id}/ack`);
     case "relay_room_create":
-      return c.request("POST", "/v1/rooms", { title: args.title });
+      return api().request("POST", "/v1/rooms", { title: args.title });
     case "relay_room_add":
-      return c.request("POST", `/v1/rooms/${args.slug}/members`, { handle: args.handle });
+      return api().request("POST", `/v1/rooms/${args.slug}/members`, { handle: args.handle });
     case "relay_remember":
-      return c.request("POST", "/v1/memory", args);
+      return api().request("POST", "/v1/memory", args);
     case "relay_recall": {
       const q = new URLSearchParams({ target: String(args.target) });
       if (args.key) q.set("key", String(args.key));
-      return c.request("GET", `/v1/memory?${q}`);
+      return api().request("GET", `/v1/memory?${q}`);
     }
     case "relay_plan_create":
-      return c.request("POST", "/v1/plans", args);
+      return api().request("POST", "/v1/plans", args);
     case "relay_plan_list":
-      return c.request("GET", `/v1/plans?target=${encodeURIComponent(String(args.target))}`);
+      return api().request("GET", `/v1/plans?target=${encodeURIComponent(String(args.target))}`);
     case "relay_plan_update":
-      return c.request("PATCH", `/v1/plans/${args.id}`, args);
+      return api().request("PATCH", `/v1/plans/${args.id}`, args);
     default:
       throw new Error(`Unknown tool ${name}`);
   }
