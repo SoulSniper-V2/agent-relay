@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "agent-relay": {
+      "command": "npx",
+      "args": ["tsx", "src/mcp.ts"],
+      "env": {
+        "RELAY_URL": "http://127.0.0.1:8787",
+        "RELAY_TOKEN": "paste-your-arl-token"
+      }
+    }
+  }
+}

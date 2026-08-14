@@ -1,0 +1,24 @@
+{
+  "name": "agent-relay",
+  "version": "0.1.0",
+  "description": "Let your coding agent talk to another person's agent — CLI, Skill, and optional MCP.",
+  "type": "module",
+  "bin": {
+    "relay": "./dist/cli.js"
+  },
+  "scripts": {
+    "relay": "node --experimental-sqlite --import tsx src/cli.ts",
+    "serve": "node --experimental-sqlite --import tsx src/serve.ts",
+    "mcp": "node --import tsx src/mcp.ts",
+    "test": "node --experimental-sqlite --import tsx --test test/*.test.ts",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}
