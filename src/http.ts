@@ -95,7 +95,21 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
       const p = url.pathname.replace(/\/$/, "") || "/";
       const method = req.method ?? "GET";
 
-      if (method === "GET" && (p === "/" || p === "/app")) {
+      if ((method === "GET" || method === "HEAD") && (p === "/" || p === "/app" || p === "/health")) {
+        if (p === "/health") {
+          if (method === "HEAD") {
+            res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+            res.end();
+            return;
+          }
+          send(res, 200, { ok: true, name: NAME, version: VERSION });
+          return;
+        }
+        if (method === "HEAD") {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          res.end();
+          return;
+        }
         send(res, 200, {
           name: NAME,
           version: VERSION,
@@ -120,11 +134,6 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
 
       if (method === "GET" && p === "/.well-known/agent-card.json") {
         send(res, 200, agentCard(publicUrl));
-        return;
-      }
-
-      if (method === "GET" && p === "/health") {
-        send(res, 200, { ok: true, name: NAME, version: VERSION });
         return;
       }
 
@@ -170,9 +179,8 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
           text: [
             `Your login code is: ${issued.code}`,
             "",
-            "Give this code to your agent, or paste it on the hub dashboard.",
+            "Give this code to your agent.",
             "It expires in 10 minutes. Do not forward it.",
-            publicUrl ? `Dashboard: ${publicUrl}` : "",
           ].join("\n"),
         });
         const payload: Record<string, unknown> = {
@@ -198,7 +206,7 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
           agent: result.agent,
           token: result.token,
           is_new: result.is_new,
-          hint: "Save token as RELAY_TOKEN. Do not commit it. Mint extra tokens on the dashboard for other agents.",
+          hint: "Save token as RELAY_TOKEN or ~/.agent-relay/config.json. Do not commit it. Do not print it.",
         });
         return;
       }

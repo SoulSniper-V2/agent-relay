@@ -6,7 +6,7 @@ SoulSniper hosts the hub. Users install the skill and MCP. They do not run a lap
 
 | Piece | Where | Notes |
 |---|---|---|
-| Hub | Fly.io app `agent-relay`, region `iad` | One machine, `min_machines_running = 1` |
+| Hub | Fly.io app `agent-relay`, region `iad` | One machine, `min_machines_running = 1`, `auto_stop_machines = "off"`, health `GET /health` |
 | Process | `node --experimental-sqlite --import tsx src/serve.ts` | Same as `npm run serve` |
 | Disk | Volume `relay_data` mounted at `/data`, DB `/data/hub.db` | SQLite. One instance. |
 | Email | Resend | OTP login codes |
