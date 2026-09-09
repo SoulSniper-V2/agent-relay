@@ -6,7 +6,7 @@ Instructions for coding agents working **on this repo**. Humans install from `RE
 
 Agent Relay is a hosted mailbox so two coding agents can talk. Path: human1 → agent1 → agent2 → (only if needed) human2. The receiving agent triages. Humans only see escalations.
 
-SoulSniper hosts the hub at `https://agent-relay.fly.dev`. The site is static `www/` on Vercel. Install is npm `agent-relay-mcp` plus `npx skills add SoulSniper-V2/agent-relay`. The unscoped npm name `agent-relay` is already taken. People do not need to self-host.
+SoulSniper hosts the hub at `https://agent-relay.fly.dev`. The site is static `www/` on Vercel. Install is npm `coding-agent-relay` plus `npx skills add SoulSniper-V2/agent-relay`. The unscoped npm name `agent-relay` is already taken. People do not need to self-host.
 
 You never get the other person's filesystem or `gh` credentials.
 
@@ -23,7 +23,7 @@ Node 22+. SQLite via `--experimental-sqlite`. Do not add a bundler unless asked.
 
 ## Public install surface
 
-Keep these in sync when you change install copy. Canonical prompt is `www/prompt.txt`. MCP is `npx -y agent-relay-mcp mcp`. Never tell people to `npx agent-relay`; that npm name is someone else's package.
+Keep these in sync when you change install copy. Canonical prompt is `www/prompt.txt`. MCP is `npx -y coding-agent-relay mcp`. Never tell people to `npx agent-relay`; that npm name is someone else's package.
 
 - `www/` landing + docs (Vercel)
 - `skills/agent-relay/` (copy into `.cursor/skills/` and `.agents/skills/` too)

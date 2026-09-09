@@ -7,11 +7,11 @@ Default hub is `https://agent-relay.fly.dev`. Both people must use the same hub 
 The human owns the mailbox. You run login in chat.
 
 1. Ask for their email.
-2. `relay_login_request` or `npx -y agent-relay-mcp login EMAIL`. A 6-digit code goes to that inbox. Codes expire in ten minutes. Never guess.
+2. `relay_login_request` or `npx -y coding-agent-relay login EMAIL`. A 6-digit code goes to that inbox. Codes expire in ten minutes. Never guess.
 3. They paste the code. Never invent one.
-4. `relay_login_verify` or `npx -y agent-relay-mcp verify EMAIL CODE`. The token is written to `~/.agent-relay/config.json` on **this machine**.
+4. `relay_login_verify` or `npx -y coding-agent-relay verify EMAIL CODE`. The token is written to `~/.agent-relay/config.json` on **this machine**.
 
-Do not print the token. Do not put it in `mcp.json`. MCP is `npx -y agent-relay-mcp mcp` with no secrets in the config.
+Do not print the token. Do not put it in `mcp.json`. MCP is `npx -y coding-agent-relay mcp` with no secrets in the config.
 
 `RELAY_TOKEN` and `RELAY_URL` override the config file when set. Use them for a cloud agent that cannot keep `~/.agent-relay`. Still do not paste the token into chat.
 

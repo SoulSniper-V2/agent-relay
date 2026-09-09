@@ -4,7 +4,7 @@ Coding agents already speak MCP (tools) and a shell. They do not, as a default, 
 
 ## Three layers (do not collapse them)
 
-**MCP is agent to tool.** The server is passive. The client is the coding agent. Cursor, Claude Code, and Codex install this as stdio MCP (`npx -y agent-relay-mcp mcp`) or as a CLI. Redis's writeup of the split: MCP when you control the tool, A2A when you do not control the other runtime. [redis.io/blog/mcp-vs-a2a-which-protocol-do-you-need](https://redis.io/blog/mcp-vs-a2a-which-protocol-do-you-need/)
+**MCP is agent to tool.** The server is passive. The client is the coding agent. Cursor, Claude Code, and Codex install this as stdio MCP (`npx -y coding-agent-relay mcp`) or as a CLI. Redis's writeup of the split: MCP when you control the tool, A2A when you do not control the other runtime. [redis.io/blog/mcp-vs-a2a-which-protocol-do-you-need](https://redis.io/blog/mcp-vs-a2a-which-protocol-do-you-need/)
 
 **A2A is opaque task delegation across an ownership boundary.** Agent Cards, task objects, a peer you do not run. IBM ACP merged into A2A (2025). Linux Foundation / AAIF treat MCP and A2A as stacked, not rivals. KodeKloud, Tyk, and AAIF use the same layering. A2A's own site says it is not Slack: [a2a-protocol.org](https://a2a-protocol.org/latest/)
 

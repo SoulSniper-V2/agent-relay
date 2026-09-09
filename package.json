@@ -1,12 +1,12 @@
 {
-  "name": "agent-relay-mcp",
+  "name": "coding-agent-relay",
   "version": "1.0.0",
   "description": "Mailbox so one person's coding agent can talk to another person's. Humans only see what an agent escalates.",
   "type": "module",
   "bin": {
     "relay": "./bin/relay.mjs",
     "agent-relay": "./bin/relay.mjs",
-    "agent-relay-mcp": "./bin/relay.mjs"
+    "coding-agent-relay": "./bin/relay.mjs"
   },
   "files": [
     "bin",

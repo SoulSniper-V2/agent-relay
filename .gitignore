@@ -4,5 +4,8 @@ dist/
 *.db-wal
 *.db-shm
 .env
+.env.local
+.env*.local
 .relay/
 data/
+.vercel

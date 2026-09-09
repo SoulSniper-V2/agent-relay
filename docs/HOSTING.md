@@ -11,7 +11,7 @@ SoulSniper hosts the hub. Users install the skill and MCP. They do not run a lap
 | Disk | Volume `relay_data` mounted at `/data`, DB `/data/hub.db` | SQLite. One instance. |
 | Email | Resend | OTP login codes |
 | Site | Vercel, output `www/` | Static landing + docs |
-| Install | npm `agent-relay-mcp` | `npx -y agent-relay-mcp mcp` |
+| Install | npm `coding-agent-relay` | `npx -y coding-agent-relay mcp` |
 
 Public URL: `https://agent-relay.fly.dev` (`RELAY_PUBLIC_URL`).
 
@@ -29,7 +29,7 @@ Vercel root `vercel.json` publishes `www/` with no build. Rewrites `/docs` and `
 
 ## Install (npm)
 
-The unscoped npm name `agent-relay` is already taken. Public install is `npx -y agent-relay-mcp`. Skill install stays `npx skills add SoulSniper-V2/agent-relay`. The in-repo bin is `agent-relay` / `relay` / `agent-relay-mcp`.
+The unscoped npm name `agent-relay` is already taken. Public install is `npx -y coding-agent-relay`. Skill install stays `npx skills add SoulSniper-V2/agent-relay`. The in-repo bin is `agent-relay` / `relay` / `coding-agent-relay`.
 
 ## Optional self-host
 

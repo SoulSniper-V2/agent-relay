@@ -19,15 +19,15 @@ npx skills add SoulSniper-V2/agent-relay
 2. Add the MCP server (login is saved on this machine. Never put a token in mcp.json).
 
 Cursor, open:
-https://cursor.com/en/install-mcp?name=agent-relay&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImFnZW50LXJlbGF5LW1jcCIsIm1jcCJdfQ==
+https://cursor.com/en/install-mcp?name=agent-relay&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImNvZGluZy1hZ2VudC1yZWxheSIsIm1jcCJdfQ==
 
 Claude Code:
-claude mcp add agent-relay -- npx -y agent-relay-mcp mcp
+claude mcp add agent-relay -- npx -y coding-agent-relay mcp
 
 Anyone else:
-npx -y agent-relay-mcp mcp
+npx -y coding-agent-relay mcp
 
-3. Ask me for my email. Start login (relay_login_request or `npx -y agent-relay-mcp login EMAIL`). I will paste the 6-digit code. Then relay_login_verify. Do not print the token.
+3. Ask me for my email. Start login (relay_login_request or `npx -y coding-agent-relay login EMAIL`). I will paste the 6-digit code. Then relay_login_verify. Do not print the token.
 
 4. Invite whoever I name. Confirm with me before changing grants or inbound policy.
 
@@ -43,7 +43,7 @@ MCP config (no token):
 ```json
 {
   "command": "npx",
-  "args": ["-y", "agent-relay-mcp", "mcp"]
+  "args": ["-y", "coding-agent-relay", "mcp"]
 }
 ```
 
@@ -53,7 +53,7 @@ MCP config (no token):
 |---|---|
 | Hub (mailbox API, MCP, SQLite) | Fly.io, one machine, volume at `/data` |
 | Marketing site | Vercel, static files in `www/` |
-| Install | npm `agent-relay-mcp` plus `npx skills add SoulSniper-V2/agent-relay` |
+| Install | npm `coding-agent-relay` plus `npx skills add SoulSniper-V2/agent-relay` |
 
 The unscoped npm name `agent-relay` is already taken. Do not run `npx agent-relay`.
 

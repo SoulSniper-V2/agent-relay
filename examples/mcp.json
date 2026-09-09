@@ -2,7 +2,7 @@
   "mcpServers": {
     "agent-relay": {
       "command": "npx",
-      "args": ["-y", "agent-relay-mcp", "mcp"]
+      "args": ["-y", "coding-agent-relay", "mcp"]
     }
   }
 }
