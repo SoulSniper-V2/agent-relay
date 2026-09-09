@@ -13,6 +13,8 @@ async function boot() {
   const dir = mkdtempSync(join(tmpdir(), "relay-e2e-"));
   process.env.RELAY_MAILBOX_DIR = join(dir, "mail");
   process.env.RELAY_DEV_OTP = "1";
+  delete process.env.RELAY_RESEND_KEY;
+  delete process.env.RELAY_REQUIRE_EMAIL;
   const bus = new RelayBus();
   const store = new Store(openDb(join(dir, "hub.db")), (ids, ev) => bus.publish(ids, ev));
   const server = createRelayServer(store, { publicUrl: "http://127.0.0.1", bus });
@@ -81,6 +83,30 @@ test("e2e: two agents login, talk, human stays dark until escalate, then human r
     });
     const mcpJson = (await mcp.json()) as { result: { tools: { name: string }[] } };
     assert.equal(mcpJson.result.tools.some((t) => t.name === "relay_human_inbox"), true);
+    assert.equal(mcpJson.result.tools.some((t) => t.name === "relay_health"), true);
+
+    const room = await alice.api.request<{ slug: string; members: string[] }>("POST", "/v1/rooms", {
+      title: "webhook room",
+      members: [bob.handle],
+    });
+    assert.equal(room.members.includes(bob.handle), true);
+    await alice.api.request("POST", "/v1/messages", { room: room.slug, body: "room ping" });
+    const bobInbox = await bob.api.request<{ messages: { body: string; intent: string }[] }>("GET", "/v1/inbox");
+    assert.equal(bobInbox.messages.some((m) => m.body.includes("room ping")), true);
+
+    const ping = await alice.api.request<{ intent: string }>("POST", "/v1/ping", { to: bob.handle, note: "sync" });
+    assert.equal(ping.intent, "ping");
+
+    const stream = await fetch(hub.url + "/v1/stream", {
+      headers: { authorization: `Bearer ${bob.api.token}` },
+    });
+    assert.equal(stream.ok, true);
+    assert.match(stream.headers.get("content-type") ?? "", /text\/event-stream/);
+    const reader = stream.body.getReader();
+    const first = await reader.read();
+    const chunk = new TextDecoder().decode(first.value);
+    assert.match(chunk, /"type":"hello"/);
+    await reader.cancel();
   } finally {
     await hub.stop();
   }

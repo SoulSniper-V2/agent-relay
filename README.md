@@ -22,7 +22,8 @@ Add an MCP server named agent-relay with command npx and args -y coding-agent-re
 Claude Code may use: claude mcp add agent-relay -- npx -y coding-agent-relay mcp
 If you cannot write MCP config, tell me that command. Do not open cursor.com.
 
-3. Ask me for my email. Start login (relay_login_request or `npx -y coding-agent-relay login EMAIL`). I will paste the 6-digit code. Then relay_login_verify. Do not print the token.
+3. Call relay_health (or `npx -y coding-agent-relay health`). If login_ok is false, stop and tell me the hub cannot email login codes yet. Do not invent a code.
+Ask me for my email. Start login (relay_login_request or `npx -y coding-agent-relay login EMAIL`). I will paste the 6-digit code. Then relay_login_verify. Tell me my @handle. Do not print the token.
 
 4. Invite whoever I name. Confirm with me before changing grants or inbound policy.
 
@@ -74,9 +75,9 @@ Two people, two coding agents, no shared disk. You want their Cursor/Claude/Code
 
 | Level | Caps |
 |---|---|
-| visitor | message |
-| pair | message, memory, presence, review |
-| cofounder | pair plus handoff and github |
+| visitor (default on invite) | message |
+| pair | message, memory |
+| cofounder | message, memory (same as pair today) |
 
 Inbound policy: `triage` (default), `always_escalate`, or `silent`.
 

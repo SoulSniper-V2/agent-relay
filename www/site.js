@@ -19,10 +19,29 @@ function flash(el, ok) {
   }, 1400);
 }
 
+function copyText(text) {
+  const clip =
+    navigator.clipboard && navigator.clipboard.writeText
+      ? navigator.clipboard.writeText(text)
+      : Promise.reject(new Error("no clipboard"));
+  return clip.catch(() => {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    if (!ok) throw new Error("copy");
+  });
+}
+
 document.querySelectorAll("[data-copy], [data-copy-from]").forEach((el) => {
   el.addEventListener("click", async () => {
     try {
-      await navigator.clipboard.writeText(textToCopy(el));
+      await copyText(textToCopy(el));
       flash(el, true);
     } catch {
       flash(el, false);
@@ -49,4 +68,23 @@ if (nav.length && sections.length && "IntersectionObserver" in window) {
     { rootMargin: "-18% 0px -70% 0px", threshold: [0, 0.2, 1] },
   );
   sections.forEach((s) => io.observe(s));
+}
+
+const hubStatus = document.getElementById("hub-status");
+if (hubStatus) {
+  fetch("https://agent-relay.fly.dev/health")
+    .then((r) => r.json())
+    .then((h) => {
+      if (h.email !== "resend") {
+        hubStatus.hidden = false;
+        hubStatus.textContent =
+          h.email === "file"
+            ? "This page is talking to a hub that writes login codes to disk, not email."
+            : "Hosted login is not sending email yet. Install works. OTP does not, until Resend is set on the hub.";
+      }
+    })
+    .catch(() => {
+      hubStatus.hidden = false;
+      hubStatus.textContent = "Could not reach the hosted hub.";
+    });
 }

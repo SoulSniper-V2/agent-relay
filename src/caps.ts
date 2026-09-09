@@ -9,7 +9,8 @@ export const LEVELS: Record<string, Cap[]> = {
   cofounder: ["message", "memory"],
 };
 
-export const DEFAULT_CAPS: Cap[] = ["message", "memory"];
+/** New contacts start here. Raise to pair only after the human says so. */
+export const DEFAULT_CAPS: Cap[] = LEVELS.visitor;
 
 export function parseCaps(raw: string | string[] | undefined, fallback: Cap[] = DEFAULT_CAPS): Cap[] {
   const parts = Array.isArray(raw)
@@ -24,4 +25,9 @@ export function parseCaps(raw: string | string[] | undefined, fallback: Cap[] = 
 
 export function capsCsv(caps: Cap[]): string {
   return [...new Set(caps)].join(",");
+}
+
+/** Cofounder and pair share the same caps today. */
+export function levelFromCaps(caps: Cap[]): "visitor" | "pair" {
+  return caps.includes("memory") ? "pair" : "visitor";
 }

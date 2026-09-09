@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { RelayError, Store } from "./store.ts";
-import { sendMail } from "./email.ts";
+import { inviteMail, inviteResult, loginCodeMail, mailStatus, sendMail } from "./email.ts";
 import { HOSTED_HUB, SITE } from "./hosted.ts";
 import type { RelayBus } from "./bus.ts";
 import { dispatchMcp, type Rpc } from "./mcp-core.ts";
@@ -52,6 +52,29 @@ function bearer(req: IncomingMessage): string | undefined {
   return typeof h === "string" ? h : undefined;
 }
 
+function clientIp(req: IncomingMessage): string {
+  const fly = req.headers["fly-client-ip"];
+  if (typeof fly === "string" && fly.trim()) return fly.trim();
+  const xff = req.headers["x-forwarded-for"];
+  if (typeof xff === "string" && xff.trim()) return xff.split(",")[0]!.trim();
+  return req.socket.remoteAddress ?? "unknown";
+}
+
+function makeLimiter(max: number, windowMs: number) {
+  const hits = new Map<string, number[]>();
+  return (key: string) => {
+    const t = Date.now();
+    const next = (hits.get(key) ?? []).filter((x) => t - x < windowMs);
+    if (next.length >= max) {
+      hits.set(key, next);
+      return false;
+    }
+    next.push(t);
+    hits.set(key, next);
+    return true;
+  };
+}
+
 function agentCard(publicUrl: string) {
   const url = publicUrl || "http://127.0.0.1:8787";
   return {
@@ -84,6 +107,7 @@ function agentCard(publicUrl: string) {
 export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?: RelayBus } = {}) {
   const publicUrl = opts.publicUrl ?? "";
   const bus = opts.bus;
+  const authIpOk = makeLimiter(10, 10 * 60 * 1000);
 
   const server = createServer(async (req, res) => {
     try {
@@ -102,7 +126,7 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
             res.end();
             return;
           }
-          send(res, 200, { ok: true, name: NAME, version: VERSION });
+          send(res, 200, { ok: true, name: NAME, version: VERSION, ...mailStatus() });
           return;
         }
         if (method === "HEAD") {
@@ -113,6 +137,7 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
         send(res, 200, {
           name: NAME,
           version: VERSION,
+          ...mailStatus(),
           mcp: "POST /mcp",
           site: SITE,
           hub: publicUrl || HOSTED_HUB,
@@ -160,7 +185,12 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
         const proto = publicUrl.startsWith("https") ? "https" : "http";
         const hubUrl = `${proto}://${host}`;
         const token = bearer(req)?.replace(/^Bearer\s+/i, "").trim();
-        const out = await dispatchMcp(msg, { hubUrl, token, store });
+        const out = await dispatchMcp(msg, {
+          hubUrl,
+          token,
+          store,
+          allowLogin: () => authIpOk(clientIp(req)),
+        });
         if (!out) {
           res.writeHead(202, { "content-type": "application/json" });
           res.end();
@@ -171,18 +201,18 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
       }
 
       if (method === "POST" && p === "/v1/auth/request") {
+        if (!authIpOk(clientIp(req))) {
+          throw new RelayError(429, "Too many login requests from this network. Try again later.");
+        }
         const b = await jsonBody(req);
         const issued = store.createLoginCode(String(b.email ?? ""));
-        const delivered = await sendMail({
-          to: issued.email,
-          subject: `Your agent-relay code: ${issued.code}`,
-          text: [
-            `Your login code is: ${issued.code}`,
-            "",
-            "Give this code to your agent.",
-            "It expires in 10 minutes. Do not forward it.",
-          ].join("\n"),
-        });
+        let delivered: { delivered: "resend" | "file" };
+        try {
+          delivered = await sendMail(loginCodeMail(issued.email, issued.code));
+        } catch (e) {
+          store.clearLoginCode(issued.email);
+          throw e;
+        }
         const payload: Record<string, unknown> = {
           ok: true,
           email: issued.email,
@@ -243,29 +273,17 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
         const b = await jsonBody(req);
         const inv = store.createInvite(me);
         const email = b.email ? String(b.email) : "";
+        let emailed: string | undefined;
+        let mail_error: string | undefined;
         if (email) {
-          await sendMail({
-            to: email,
-            subject: `@${me.user.handle} invited your agent to agent-relay`,
-            text: [
-              `@${me.user.handle} wants your agents to talk — humans stay out until an agent escalates.`,
-              "",
-              `1. Open ${publicUrl || "the hub"} or tell your agent: relay login ${email}`,
-              `2. After login: relay accept ${inv.code}`,
-              "",
-              `Invite code: ${inv.code}`,
-            ].join("\n"),
-          });
+          try {
+            await sendMail(inviteMail(me.user.handle, email, inv.code));
+            emailed = email;
+          } catch (e) {
+            mail_error = e instanceof Error ? e.message : "email failed";
+          }
         }
-        send(res, 201, {
-          ...inv,
-          emailed: email || undefined,
-          accept: `relay accept ${inv.code}`,
-          hint: email
-            ? `Emailed ${email}. They log in, then relay accept ${inv.code}.`
-            : "Send this code to a friend. They log in on the same hub, then accept.",
-          hub: publicUrl || undefined,
-        });
+        send(res, 201, inviteResult(inv, { emailed, mail_error, hub: publicUrl || undefined }));
         return;
       }
 
@@ -314,7 +332,6 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
             intent: b.intent ? String(b.intent) : undefined,
             needs_human: Boolean(b.needs_human),
             reply_to: b.reply_to ? String(b.reply_to) : undefined,
-            from_role: b.from_role === "human" ? "human" : "agent",
             payload: b.payload && typeof b.payload === "object" ? (b.payload as Record<string, unknown>) : undefined,
           }),
         );
@@ -332,7 +349,6 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
             action: String(b.action ?? "") as "handle" | "escalate" | "dismiss" | "reply",
             reason: b.reason != null ? String(b.reason) : undefined,
             reply: b.reply != null ? String(b.reply) : undefined,
-            from_role: b.from_role === "human" ? "human" : "agent",
           }),
         );
         return;
@@ -483,7 +499,8 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
       send(res, 404, { error: "Not found" });
     } catch (e) {
       if (e instanceof RelayError) {
-        const extra = e.status === 401 ? { "www-authenticate": 'Bearer realm="agent-relay"' } : {};
+        const extra: Record<string, string> = {};
+        if (e.status === 401) extra["www-authenticate"] = 'Bearer realm="agent-relay"';
         send(res, e.status, { error: e.message }, extra);
         return;
       }

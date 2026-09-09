@@ -1,6 +1,6 @@
 {
   "name": "coding-agent-relay",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Mailbox so one person's coding agent can talk to another person's. Humans only see what an agent escalates.",
   "type": "module",
   "bin": "./bin/relay.mjs",
@@ -28,6 +28,7 @@
     "test": "node --experimental-sqlite --import tsx --test test/*.test.ts && bash scripts/e2e-cli.sh",
     "test:unit": "node --experimental-sqlite --import tsx --test test/*.test.ts",
     "test:cli": "bash scripts/e2e-cli.sh",
+    "hosted-check": "bash scripts/hosted-check.sh",
     "build": "tsc"
   },
   "dependencies": {

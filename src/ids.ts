@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 export function id(prefix: string): string {
   return `${prefix}_${randomBytes(8).toString("hex")}`;
@@ -13,12 +13,21 @@ export function token(): string {
 }
 
 export function otp(): string {
-  const n = randomBytes(4).readUInt32BE(0) % 1_000_000;
-  return n.toString().padStart(6, "0");
+  for (;;) {
+    const n = randomBytes(4).readUInt32BE(0);
+    if (n < 4_294_000_000) return (n % 1_000_000).toString().padStart(6, "0");
+  }
 }
 
 export function hashToken(t: string): string {
   return createHash("sha256").update(t).digest("hex");
+}
+
+export function hashEquals(a: string, b: string): boolean {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  if (left.length !== right.length) return false;
+  return timingSafeEqual(left, right);
 }
 
 export function now(): number {

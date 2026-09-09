@@ -19,5 +19,5 @@ const server = createRelayServer(store, { publicUrl, bus });
 server.listen(port, "0.0.0.0", () => {
   console.log(`agent-relay ${VERSION} on ${publicUrl}`);
   console.log(`db: ${dbPath}`);
-  console.log("Agents: MCP POST /mcp   Humans: GET /   Login: relay login you@email.com");
+  console.log("Agents: stdio MCP (`relay mcp`) or CLI. Hub JSON: GET /");
 });

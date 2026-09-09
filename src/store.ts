@@ -1,8 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 import { formatAgentAddr, normalizeSlug, parseTarget } from "./address.ts";
-import { DEFAULT_CAPS, LEVELS, POLICIES, capsCsv, parseCaps, type Cap } from "./caps.ts";
+import { DEFAULT_CAPS, LEVELS, POLICIES, capsCsv, levelFromCaps, parseCaps, type Cap } from "./caps.ts";
 import { RelayError } from "./errors.ts";
-import { dmScope, hashToken, id, inviteCode, now, otp, roomScope, token } from "./ids.ts";
+import { dmScope, hashEquals, hashToken, id, inviteCode, now, otp, roomScope, token } from "./ids.ts";
 import { normalizeEmail } from "./email.ts";
 import { looksLikeInjection, wrapUntrusted } from "./untrusted.ts";
 import type {
@@ -56,7 +56,7 @@ export class Store {
   ) {}
 
   private notify(userIds: string[], ev: Omit<RelayEvent, "at">) {
-    this.emit?.(userIds, { ...ev, at: now() });
+    this.emit?.(userIds, { type: ev.type, ...ev, at: now() });
   }
 
   private getUser(id: string): User | undefined {
@@ -216,6 +216,10 @@ export class Store {
     return { email, code, expires_at };
   }
 
+  clearLoginCode(email: string) {
+    this.db.prepare("DELETE FROM login_codes WHERE email = ?").run(email);
+  }
+
   verifyLogin(emailRaw: string, codeRaw: string): { user: User; agent: Agent; token: string; is_new: boolean } {
     let email: string;
     try {
@@ -231,7 +235,7 @@ export class Store {
     if (Number(row.expires_at) < now()) throw new RelayError(400, "Code expired. Request a new one.");
     if (Number(row.attempts) >= 5) throw new RelayError(429, "Too many tries. Request a new code.");
     this.db.prepare("UPDATE login_codes SET attempts = attempts + 1 WHERE email = ?").run(email);
-    if (hashToken(code) !== String(row.code_hash)) {
+    if (!hashEquals(hashToken(code), String(row.code_hash))) {
       throw new RelayError(400, "Wrong code. Check the email and try again.");
     }
     this.db.prepare("DELETE FROM login_codes WHERE email = ?").run(email);
@@ -457,6 +461,8 @@ export class Store {
         card: agent.card,
         they_allow_you: they.caps,
         you_allow_them: you.caps,
+        they_level: levelFromCaps(they.caps),
+        you_level: levelFromCaps(you.caps),
         your_inbound_policy: you.inbound_policy,
       };
     });
@@ -539,6 +545,7 @@ export class Store {
       body: `@${me.user.handle} added @${other.handle} to the room.`,
       intent: "system",
       from_role: "system",
+      allow_system: true,
     });
     return this.getRoom(slug)!;
   }
@@ -594,6 +601,10 @@ export class Store {
       needs_human?: boolean;
       reply_to?: string;
       from_role?: FromRole;
+      /** Only resolveHuman may set this. Never accept it from HTTP/MCP. */
+      allow_human?: boolean;
+      /** Only store internals may set this. Never accept it from HTTP/MCP. */
+      allow_system?: boolean;
       payload?: Record<string, unknown>;
     },
   ): PublicMessage {
@@ -602,7 +613,15 @@ export class Store {
     if (text.length > MAX_BODY) throw new RelayError(400, "Message too long (max 20k).");
     const intent = (spec.intent?.trim() || "chat") as Intent;
     if (!INTENTS.has(intent)) throw new RelayError(400, `Unknown intent. Use ${[...INTENTS].join(", ")}.`);
-    const fromRole: FromRole = spec.from_role ?? "agent";
+    if (spec.from_role === "human" && spec.allow_human !== true) {
+      throw new RelayError(403, "Human-attributed mail only goes through relay_human_reply after an escalation.");
+    }
+    const fromRole: FromRole =
+      spec.from_role === "human" && spec.allow_human
+        ? "human"
+        : spec.from_role === "system" && (spec.allow_system || me.token_name === "system")
+          ? "system"
+          : "agent";
     const needsHuman = Boolean(spec.needs_human);
 
     if (spec.room) {
@@ -722,7 +741,7 @@ export class Store {
       let triage: string = "pending";
       let visibility = "agent";
       let reason = "";
-      if (policy === "always_escalate") {
+      if (opts.fromRole !== "system" && policy === "always_escalate") {
         triage = "escalated";
         visibility = "human";
         reason = "policy: always_escalate";
@@ -867,7 +886,7 @@ export class Store {
         ...target,
         body,
         reply_to: messageId,
-        from_role: spec.from_role ?? "agent",
+        from_role: "agent",
       });
     }
 
@@ -906,6 +925,7 @@ export class Store {
           body: spec.reply.trim(),
           reply_to: messageId,
           from_role: "human",
+          allow_human: true,
         });
       }
     }
@@ -972,6 +992,7 @@ export class Store {
     }
     const body = String(r.body);
     const intent = String(r.intent ?? "chat") as Intent;
+    const peer = String(r.from_user) !== viewerUserId;
     return {
       id: String(r.id),
       thread_id: String(r.thread_id),
@@ -989,7 +1010,7 @@ export class Store {
       triage: (delivery?.triage ?? String(r.triage ?? "pending")) as PublicMessage["triage"],
       visibility: (delivery?.visibility ?? String(r.visibility ?? "agent")) as PublicMessage["visibility"],
       escalate_reason: delivery?.escalate_reason ?? String(r.escalate_reason ?? ""),
-      untrusted: wrapUntrusted({ id: String(r.id), from, body, intent }),
+      untrusted: peer ? wrapUntrusted({ id: String(r.id), from, body, intent }) : body,
     };
   }
 
@@ -1055,12 +1076,16 @@ export class Store {
     return dmScope(me.user.id, other.id);
   }
 
-  remember(me: Actor, target: string, key: string, value: string) {
+  private requireMemoryAccess(me: Actor, target: string) {
     const addr = parseTarget(target);
-    if (addr.kind === "agent") {
-      const other = this.getUserByHandle(addr.handle);
-      if (other) this.requireAllowed(me.user, other, "memory");
-    }
+    if (addr.kind === "room") return;
+    const other = this.getUserByHandle(addr.handle);
+    if (!other) throw new RelayError(404, `No person or room named ${addr.handle}.`);
+    this.requireAllowed(me.user, other, "memory");
+  }
+
+  remember(me: Actor, target: string, key: string, value: string) {
+    this.requireMemoryAccess(me, target);
     const scope = this.resolveScope(me, target);
     const k = key.trim();
     if (!k) throw new RelayError(400, "Memory key is required.");
@@ -1084,6 +1109,7 @@ export class Store {
   }
 
   recall(me: Actor, target: string, key?: string) {
+    this.requireMemoryAccess(me, target);
     const scope = this.resolveScope(me, target);
     if (key) {
       const row = this.db.prepare("SELECT * FROM memory WHERE scope = ? AND key = ?").get(scope, key) as

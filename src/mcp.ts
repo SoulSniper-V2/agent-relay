@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * MCP stdio adapter. Hosted Cursor/Claude should prefer POST /mcp on the hub.
- * Auth via RELAY_TOKEN + RELAY_URL or ~/.agent-relay/config.json.
+ * MCP stdio adapter — this is the install path (npx -y coding-agent-relay mcp).
+ * Login saves the PAT on this machine. Do not put a token in mcp.json.
+ * POST /mcp on the hub is for already-authed HTTP clients with Authorization: Bearer.
  */
 import { writeSync } from "node:fs";
 import { createInterface } from "node:readline";

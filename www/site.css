@@ -167,6 +167,12 @@ nav a:hover, nav a[aria-current="page"] { color: var(--ink); }
   letter-spacing: -0.01em;
   margin: 0 0 2.4rem;
 }
+.hub-status {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  margin: -1.8rem 0 2.4rem;
+}
 
 .composer {
   border: 1px solid var(--line);

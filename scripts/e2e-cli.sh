@@ -8,6 +8,8 @@ export RELAY_MAILBOX_DIR="$DIR/mail"
 export RELAY_DB="$DIR/hub.db"
 export RELAY_PORT="$PORT"
 export RELAY_URL="http://127.0.0.1:$PORT"
+unset RELAY_RESEND_KEY || true
+unset RELAY_REQUIRE_EMAIL || true
 CLI=(node --experimental-sqlite --import tsx "$ROOT/src/cli.ts")
 
 node --experimental-sqlite --import tsx "$ROOT/src/serve.ts" >"$DIR/hub.log" 2>&1 &
@@ -19,12 +21,15 @@ for i in $(seq 1 50); do
   sleep 0.1
 done
 curl -sf "$RELAY_URL/health" >/dev/null
+python3 -c "import json,urllib.request; d=json.load(urllib.request.urlopen('$RELAY_URL/health')); assert d.get('email')=='file', d"
 code=$(curl -s -o /tmp/relay-mcp-code -w "%{http_code}" "$RELAY_URL/mcp")
 test "$code" = "405"
 
 alice() { RELAY_CONFIG="$DIR/alice.json" "${CLI[@]}" "$@"; }
 bob() { RELAY_CONFIG="$DIR/bob.json" "${CLI[@]}" "$@"; }
 jget() { python3 -c "import json,sys; d=json.load(sys.stdin); print($1)"; }
+
+alice health | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['email']=='file' and d['ok'] is True, d"
 
 alice login alice@test.dev >"$DIR/a-login.json"
 CODE=$(jget "d['dev_code']" <"$DIR/a-login.json")

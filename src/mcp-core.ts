@@ -1,21 +1,29 @@
 /**
- * MCP JSON-RPC for stdio (local Cursor) and Streamable HTTP POST /mcp (hosted).
- * Hosted calls the Store in-process. Stdio talks to the hub over HTTP.
+ * MCP JSON-RPC for stdio (the install path) and Streamable HTTP POST /mcp
+ * (Bearer PAT after login). Stdio persists the token on disk. HTTP MCP never
+ * returns a PAT to the model.
  */
 import { RelayClient } from "./client.ts";
 import { loadConfig, saveConfig } from "./config.ts";
+import { inviteMail, inviteResult, loginCodeMail, mailStatus, sendMail } from "./email.ts";
 import type { Store } from "./store.ts";
-import { VERSION } from "./version.ts";
+import { NAME, VERSION } from "./version.ts";
 
 export type Rpc = { jsonrpc: "2.0"; id?: number | string; method?: string; params?: Record<string, unknown> };
 
-const OPEN_TOOLS = new Set(["relay_login_request", "relay_login_verify"]);
+const OPEN_TOOLS = new Set(["relay_health", "relay_login_request", "relay_login_verify"]);
 
 export const MCP_TOOLS = [
   {
+    name: "relay_health",
+    description:
+      "Hub status. login_ok is false until OTP email is live. If login_ok is false, tell the human the hub cannot send login codes. Do not invent a code.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
     name: "relay_login_request",
     description:
-      "Start login: email a 6-digit code to the human. Then ask them for the code and call relay_login_verify. Never invent a code.",
+      "Start login: email a 6-digit code to the human. Call relay_health first; if login_ok is false, stop and tell the human. Then ask them for the code and call relay_login_verify. Never invent a code.",
     inputSchema: { type: "object", properties: { email: { type: "string" } }, required: ["email"] },
   },
   {
@@ -50,7 +58,7 @@ export const MCP_TOOLS = [
   },
   {
     name: "relay_people",
-    description: "People whose agents you can talk to, plus inbound policy (triage / always_escalate / silent).",
+    description: "People whose agents you can talk to, plus grant levels (visitor/pair) and inbound policy (triage / always_escalate / silent).",
     inputSchema: { type: "object", properties: {} },
   },
   {
@@ -87,7 +95,6 @@ export const MCP_TOOLS = [
         action: { type: "string", description: "handle | escalate | dismiss | reply" },
         reason: { type: "string", description: "Required-ish for escalate — why the human should look." },
         reply: { type: "string", description: "Body when action=reply" },
-        from_role: { type: "string", description: "agent (default) or human if they told you what to say" },
       },
       required: ["id", "action"],
     },
@@ -193,7 +200,30 @@ function api(hubUrl: string, token: string | undefined, requireToken: boolean) {
   return new RelayClient(hubUrl, token);
 }
 
-type Ctx = { hubUrl: string; token?: string; persistAuth?: boolean; store?: Store };
+type Ctx = { hubUrl: string; token?: string; persistAuth?: boolean; store?: Store; allowLogin?: () => boolean };
+
+function loginSaved(
+  res: { user: { handle: string }; agent?: { slug: string }; token: string; is_new?: boolean },
+  ctx: Ctx,
+) {
+  if (ctx.persistAuth && res.token) {
+    const cfg = loadConfig();
+    saveConfig({ url: cfg.url || ctx.hubUrl, handle: res.user.handle, token: res.token });
+    return {
+      ok: true,
+      handle: res.user.handle,
+      address: res.agent ? `@${res.user.handle}/${res.agent.slug}` : undefined,
+      saved: true,
+      hint: "Token saved on this machine. Do not print it.",
+    };
+  }
+  return {
+    ok: true,
+    handle: res.user.handle,
+    is_new: res.is_new,
+    hint: "Token is not returned over MCP. Finish login with stdio MCP or `relay verify` so it saves on this machine.",
+  };
+}
 
 function localActor(ctx: Ctx) {
   if (!ctx.store) return null;
@@ -207,46 +237,56 @@ async function callTool(ctx: Ctx, name: string, args: Record<string, unknown>): 
   const actor = store && need ? localActor(ctx) : null;
 
   switch (name) {
+    case "relay_health":
+      if (store) {
+        return { ok: true, name: NAME, version: VERSION, hub: ctx.hubUrl || "local", ...mailStatus() };
+      }
+      {
+        const remote = await api(ctx.hubUrl, ctx.token, false).request<Record<string, unknown>>("GET", "/health");
+        return { ...remote, hub: ctx.hubUrl, ...mailStatus(remote.email) };
+      }
+
     case "relay_login_request":
+      if (ctx.allowLogin && !ctx.allowLogin()) {
+        throw new Error("Too many login requests from this network. Try again later.");
+      }
       if (store) {
         const issued = store.createLoginCode(String(args.email ?? ""));
-        const { sendMail } = await import("./email.ts");
-        const delivered = await sendMail({
-          to: issued.email,
-          subject: `Your agent-relay code: ${issued.code}`,
-          text: `Your login code is: ${issued.code}\nIt expires in 10 minutes.`,
-        });
+        let delivered: { delivered: "resend" | "file" };
+        try {
+          delivered = await sendMail(loginCodeMail(issued.email, issued.code));
+        } catch (e) {
+          store.clearLoginCode(issued.email);
+          throw e;
+        }
         const payload: Record<string, unknown> = {
           ok: true,
           email: issued.email,
           delivered: delivered.delivered,
           hint: "Ask the human for the 6-digit code, then relay_login_verify. Do not guess.",
         };
-        if (process.env.RELAY_DEV_OTP === "1") payload.dev_code = issued.code;
         return payload;
       }
-      return api(ctx.hubUrl, ctx.token, need).request("POST", "/v1/auth/request", { email: args.email });
+      const requested = await api(ctx.hubUrl, ctx.token, need).request<Record<string, unknown>>(
+        "POST",
+        "/v1/auth/request",
+        { email: args.email },
+      );
+      const { dev_code: _drop, ...publicReq } = requested;
+      return publicReq;
 
     case "relay_login_verify": {
       if (store) {
         const res = store.verifyLogin(String(args.email ?? ""), String(args.code ?? ""));
-        if (ctx.persistAuth && res.token) {
-          const cfg = loadConfig();
-          saveConfig({ url: cfg.url || ctx.hubUrl, handle: res.user.handle, token: res.token });
-          return { ok: true, handle: res.user.handle, address: `@${res.user.handle}/${res.agent.slug}`, saved: true };
-        }
-        return { user: res.user, agent: res.agent, token: res.token, is_new: res.is_new };
+        return loginSaved(res, ctx);
       }
       const res = await api(ctx.hubUrl, ctx.token, need).request<{
         token: string;
         user: { handle: string };
+        agent: { slug: string };
+        is_new?: boolean;
       }>("POST", "/v1/auth/verify", { email: args.email, code: args.code });
-      if (ctx.persistAuth && res.token) {
-        const cfg = loadConfig();
-        saveConfig({ url: cfg.url || ctx.hubUrl, handle: res.user.handle, token: res.token });
-        return { ok: true, handle: res.user.handle, saved: true };
-      }
-      return res;
+      return loginSaved(res, ctx);
     }
 
     case "relay_whoami":
@@ -257,9 +297,24 @@ async function callTool(ctx: Ctx, name: string, args: Record<string, unknown>): 
       if (actor && store) return store.sync(actor);
       return api(ctx.hubUrl, ctx.token, need).request("GET", "/v1/sync");
 
-    case "relay_invite":
-      if (actor && store) return store.createInvite(actor);
+    case "relay_invite": {
+      if (actor && store) {
+        const inv = store.createInvite(actor);
+        const email = args.email ? String(args.email) : "";
+        let emailed: string | undefined;
+        let mail_error: string | undefined;
+        if (email) {
+          try {
+            await sendMail(inviteMail(actor.user.handle, email, inv.code));
+            emailed = email;
+          } catch (e) {
+            mail_error = e instanceof Error ? e.message : "email failed";
+          }
+        }
+        return inviteResult(inv, { emailed, mail_error, hub: ctx.hubUrl || undefined });
+      }
       return api(ctx.hubUrl, ctx.token, need).request("POST", "/v1/invites", args.email ? { email: args.email } : {});
+    }
 
     case "relay_accept":
       if (actor && store) return store.acceptInvite(actor, String(args.code ?? ""));
@@ -301,14 +356,12 @@ async function callTool(ctx: Ctx, name: string, args: Record<string, unknown>): 
           action: String(args.action) as "handle" | "escalate" | "dismiss" | "reply",
           reason: args.reason != null ? String(args.reason) : undefined,
           reply: args.reply != null ? String(args.reply) : undefined,
-          from_role: args.from_role === "human" ? "human" : "agent",
         });
       }
       return api(ctx.hubUrl, ctx.token, need).request("POST", `/v1/messages/${args.id}/decide`, {
         action: args.action,
         reason: args.reason,
         reply: args.reply,
-        from_role: args.from_role,
       });
 
     case "relay_human_inbox":

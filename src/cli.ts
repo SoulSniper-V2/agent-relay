@@ -46,10 +46,10 @@ async function main() {
   if (!cmd || cmd === "help" || cmd === "-h" || cmd === "--help") {
     process.stdout.write(`agent-relay — agents talk; humans only see what an agent escalates
 
-Setup
-  relay serve [--port=8787]      Start the shared hub
+Login (hosted hub by default)
   relay login <email>            Email a 6-digit code to the human
   relay verify <email> <code>    Finish login; saves RELAY_TOKEN
+  relay health                   Hub status (login_ok, email: resend | file | off)
   relay whoami                   You + people + pending + human inbox
   relay sync                     Session board (handle agent mail yourself)
   relay tokens [--name] [--agent slug]   Mint a PAT for MCP / another runtime
@@ -63,7 +63,7 @@ People
   relay status working [detail]
 
 Talk (you are the filter)
-  relay send <handle|#room> <text> [--intent chat] [--human]
+  relay send <handle|#room> <text> [--intent chat] [--needs-human]
   relay inbox [--all] [--wait=sec]     Pending for THIS agent
   relay decide <id> handle|escalate|dismiss|reply [--reason] [--body]
   relay human-inbox                    Escalations to SHOW your human
@@ -83,7 +83,11 @@ Other
   relay mcp                            Run as an MCP stdio server
   relay help
 
+Self-host (you probably don't)
+  relay serve [--port=8787]
+
 Env: RELAY_URL  RELAY_TOKEN  RELAY_CONFIG  RELAY_PORT  RELAY_DB
+Default hub: https://agent-relay.fly.dev
 `);
     return;
   }
@@ -95,6 +99,12 @@ Env: RELAY_URL  RELAY_TOKEN  RELAY_CONFIG  RELAY_PORT  RELAY_DB
       if (port) process.env.RELAY_PORT = port;
       if (db) process.env.RELAY_DB = db;
       await import("./serve.ts");
+      return;
+    }
+
+    if (cmd === "health") {
+      const { api } = client();
+      out(await api.request("GET", "/health"));
       return;
     }
 
@@ -198,12 +208,12 @@ Env: RELAY_URL  RELAY_TOKEN  RELAY_CONFIG  RELAY_PORT  RELAY_DB
       const reply = flag(argv, "reply");
       const intent = flag(argv, "intent");
       const text = argv.slice(2).filter((a) => !a.startsWith("--")).join(" ");
-      if (!target || !text) fail("Usage: relay send <handle|#room> <message> [--human] [--intent chat]");
+      if (!target || !text) fail("Usage: relay send <handle|#room> <message> [--needs-human] [--intent chat]");
       const { api } = authed();
       const body = {
         body: text,
         intent,
-        needs_human: hasFlag(argv, "human"),
+        needs_human: hasFlag(argv, "needs-human") || hasFlag(argv, "human"),
         reply_to: reply,
         to: undefined as string | undefined,
         room: undefined as string | undefined,
