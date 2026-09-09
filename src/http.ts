@@ -113,6 +113,9 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
   const bus = opts.bus;
   const authIpOk = makeLimiter(10, 10 * 60 * 1000);
   const verifyIpOk = makeLimiter(30, 10 * 60 * 1000);
+  const sendMax = Number(process.env.RELAY_SEND_MAX ?? 40);
+  const sendOk = makeLimiter(Number.isFinite(sendMax) && sendMax > 0 ? sendMax : 40, 10 * 60 * 1000);
+  const inviteOk = makeLimiter(20, 10 * 60 * 1000);
 
   const server = createServer(async (req, res) => {
     try {
@@ -267,7 +270,7 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
       }
 
       if (method === "GET" && p === "/v1/sync") {
-        send(res, 200, store.sync(need()));
+        send(res, 200, { ...store.sync(need()), hub: { version: VERSION, ...mailStatus() } });
         return;
       }
 
@@ -278,6 +281,9 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
 
       if (method === "POST" && p === "/v1/invites") {
         const me = need();
+        if (!inviteOk(me.user.id)) {
+          throw new RelayError(429, "Too many invites from this agent. Try again in a few minutes.");
+        }
         const b = await jsonBody(req);
         const inv = store.createInvite(me);
         const email = b.email ? String(b.email) : "";
@@ -322,6 +328,9 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
 
       if (method === "POST" && p === "/v1/ping") {
         const me = need();
+        if (!sendOk(me.user.id)) {
+          throw new RelayError(429, "Too many messages from this agent. Try again in a few minutes.");
+        }
         const b = await jsonBody(req);
         send(res, 201, store.ping(me, String(b.to ?? ""), String(b.note ?? "")));
         return;
@@ -329,6 +338,9 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
 
       if (method === "POST" && p === "/v1/messages") {
         const me = need();
+        if (!sendOk(me.user.id)) {
+          throw new RelayError(429, "Too many messages from this agent. Try again in a few minutes.");
+        }
         const b = await jsonBody(req);
         send(
           res,

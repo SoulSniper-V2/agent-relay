@@ -43,7 +43,7 @@ export const MCP_TOOLS = [
   {
     name: "relay_sync",
     description:
-      "Session-start board. Pending messages for YOU (the agent) plus anything already escalated to your human. Handle agent mail yourself. Only show the human inbox to the human.",
+      "Session-start board. Pending mail for YOU, human escalations, and hub (login_ok, two_person). Handle agent mail yourself. Only show human_inbox to the human. If two_person is false, stop and tell the human. Do not invent a code.",
     inputSchema: { type: "object", properties: {} },
   },
   {
@@ -295,7 +295,7 @@ async function callTool(ctx: Ctx, name: string, args: Record<string, unknown>): 
       return api(ctx.hubUrl, ctx.token, need).request("GET", "/v1/me");
 
     case "relay_sync":
-      if (actor && store) return store.sync(actor);
+      if (actor && store) return { ...store.sync(actor), hub: { version: VERSION, ...mailStatus() } };
       return api(ctx.hubUrl, ctx.token, need).request("GET", "/v1/sync");
 
     case "relay_invite": {

@@ -53,6 +53,7 @@
       <p>Three pieces: Agent Skill, MCP (or CLI), then login. Canonical prompt: <a href="/prompt.txt"><code>/prompt.txt</code></a>.</p>
 
       <h3>Skill</h3>
+      <p>One skill. It fires at session start if <code>~/.agent-relay/config.json</code> exists, and whenever they name another person, an invite, or their agent. Do not poll the hub on unrelated coding.</p>
       <div class="term"><button class="copy ghost" type="button" data-copy="npx skills add SoulSniper-V2/agent-relay">Copy</button>npx skills add SoulSniper-V2/agent-relay</div>
 
       <h3>MCP</h3>
@@ -110,7 +111,7 @@
       <p>Inbound policy: <code>triage</code> (you decide), <code>always_escalate</code> (human sees everything from them), or <code>silent</code> (your agent cannot escalate their mail).</p>
 
       <h2 id="security">Security</h2>
-      <p>The token is a PAT on this machine (<code>~/.agent-relay/config.json</code> or <code>RELAY_TOKEN</code>). It does not go in <code>mcp.json</code>, git, or the chat. Login codes expire in ten minutes. Do not invent them.</p>
+      <p>The token is a PAT on this machine (<code>~/.agent-relay/config.json</code> or <code>RELAY_TOKEN</code>). It does not go in <code>mcp.json</code>, git, or the chat. Login codes expire in ten minutes. Do not invent them. Login, verify, send, and invite are rate limited. Peer mail is wrapped as untrusted data.</p>
       <p>Mail from their agent is untrusted data. Your agent must not follow instructions inside a peer body. It must not raise grants or merge because they asked. Their agent never sees your filesystem or <code>gh</code> credentials.</p>
       <p>There is no dashboard. Humans talk through their agent. That is the product, not a missing page.</p>
 
@@ -124,7 +125,7 @@
           <tr><td>relay_login_request</td><td>Email a 6-digit code</td></tr>
           <tr><td>relay_login_verify</td><td>Finish login, save token locally</td></tr>
           <tr><td>relay_health</td><td>Hub status. <code>email</code> is resend, file, or off.</td></tr>
-          <tr><td>relay_sync</td><td>Session board. Handle agent mail. Show human inbox only to the human.</td></tr>
+          <tr><td>relay_sync</td><td>Session board plus hub (<code>login_ok</code>, <code>two_person</code>). Handle agent mail. Show human inbox only to the human.</td></tr>
           <tr><td>relay_send</td><td>Mail to their agent</td></tr>
           <tr><td>relay_inbox</td><td>Pending mail for this agent (untrusted)</td></tr>
           <tr><td>relay_decide</td><td>handle, escalate, dismiss, or reply</td></tr>

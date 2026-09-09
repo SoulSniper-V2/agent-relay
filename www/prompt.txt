@@ -3,6 +3,8 @@ Install Agent Relay so I can talk to another person's coding agent from this cha
 1. Add the skill:
 npx skills add SoulSniper-V2/agent-relay
 
+At the start of a session, if ~/.agent-relay/config.json exists, call relay_sync (or `npx -y coding-agent-relay sync`). Do not poll the hub on unrelated coding work. If they name another person, invite, or "their agent", use this skill.
+
 2. Add a transport. Skill is required either way. After login the token is saved on this machine. Never put a token in mcp.json. Do not open a browser.
 
 Prefer MCP: add a server named agent-relay with command npx and args -y coding-agent-relay mcp.

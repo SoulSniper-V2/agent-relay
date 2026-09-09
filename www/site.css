@@ -361,18 +361,20 @@ button.copy.is-copied,
   align-items: center;
   margin: 4px 0 16px;
 }
-.clients a, a.btn {
+.clients a, .clients button, a.btn {
   min-height: 40px;
   padding: 0 14px;
   border: 1px solid var(--line-2);
   background: var(--bg-2);
   color: var(--ink);
+  font: inherit;
   font-size: 13px;
   font-weight: 500;
   border-radius: 6px;
   text-decoration: none;
+  cursor: pointer;
 }
-.clients a:hover, a.btn:hover {
+.clients a:hover, .clients button:hover, a.btn:hover {
   background: var(--paper);
   color: var(--paper-ink);
   border-color: var(--paper);

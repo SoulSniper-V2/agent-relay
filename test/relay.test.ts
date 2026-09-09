@@ -319,6 +319,9 @@ test("HTTP: invite, send, inbox, decide across two tokens", async () => {
     const human = await bobApi.request<{ items: unknown[] }>("GET", "/v1/human/inbox");
     assert.equal(human.items.length, 0);
     await bobApi.request("POST", `/v1/messages/${inbox.messages.at(-1)!.id}/decide`, { action: "handle" });
+    const board = await bobApi.request<{ hub: { login_ok: boolean; email: string }; pending: unknown[] }>("GET", "/v1/sync");
+    assert.equal(board.hub.email, "file");
+    assert.equal(typeof board.hub.login_ok, "boolean");
     const home = await new RelayClient(url).request<{ name: string; email: string }>("GET", "/");
     assert.equal(home.name, "agent-relay");
     assert.equal(home.email, "file");
@@ -543,6 +546,11 @@ test("MCP tools/call send and decide against the in-process store", async () => 
       { hubUrl: "http://local", token: alice.token, store },
     );
     assert.match(JSON.stringify(sent), /review the types/);
+    const synced = await dispatchMcp(
+      { jsonrpc: "2.0", id: 21, method: "tools/call", params: { name: "relay_sync", arguments: {} } },
+      { hubUrl: "http://local", token: bob.token, store },
+    );
+    assert.match(JSON.stringify(synced), /"email":"file"/);
     const inbox = store.inbox(bob.actor, { pending: true });
     assert.equal(inbox.some((m) => m.body.includes("review the types")), true);
 
@@ -612,4 +620,44 @@ test("public site stays on Vercel and the hub stays on the VM", async () => {
   assert.equal(HOSTED_HUB, "https://35.211.23.64.sslip.io");
   assert.equal(SITE, "https://agent-relay-eight.vercel.app");
   assert.notEqual(HOSTED_HUB, SITE);
+});
+
+test("HTTP send is rate limited per user", async () => {
+  const { dir, db } = tmpDb();
+  process.env.RELAY_DEV_OTP = "1";
+  process.env.RELAY_MAILBOX_DIR = join(dir, "mail");
+  process.env.RELAY_SEND_MAX = "2";
+  delete process.env.RELAY_RESEND_KEY;
+  delete process.env.RELAY_REQUIRE_EMAIL;
+  const store = new Store(openDb(db));
+  const server = createRelayServer(store);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const addr = server.address();
+  const port = typeof addr === "object" && addr ? addr.port : 0;
+  const url = `http://127.0.0.1:${port}`;
+  async function login(email: string) {
+    const api = new RelayClient(url);
+    const req = await api.request<{ email: string; dev_code: string }>("POST", "/v1/auth/request", { email });
+    return api.request<{ token: string }>("POST", "/v1/auth/verify", { email: req.email, code: req.dev_code });
+  }
+  try {
+    const alice = await login("alice@test.dev");
+    const bob = await login("bob@test.dev");
+    const aliceApi = new RelayClient(url, alice.token);
+    const bobApi = new RelayClient(url, bob.token);
+    const inv = await aliceApi.request<{ code: string }>("POST", "/v1/invites", {});
+    await bobApi.request("POST", "/v1/invites/accept", { code: inv.code });
+    await aliceApi.request("POST", "/v1/messages", { to: "bob", body: "one" });
+    await aliceApi.request("POST", "/v1/messages", { to: "bob", body: "two" });
+    await assert.rejects(
+      () => aliceApi.request("POST", "/v1/messages", { to: "bob", body: "three" }),
+      (e: unknown) => e instanceof ApiError && e.status === 429,
+    );
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())));
+    rmSync(dir, { recursive: true, force: true });
+    delete process.env.RELAY_DEV_OTP;
+    delete process.env.RELAY_MAILBOX_DIR;
+    delete process.env.RELAY_SEND_MAX;
+  }
 });
