@@ -1,0 +1,43 @@
+name: npm
+on:
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - package-lock.json
+      - src/**
+      - bin/**
+      - skills/**
+      - .github/workflows/publish.yml
+  workflow_dispatch:
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm test
+      - name: Publish if version is new
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          LOCAL="$(node -p "require('./package.json').version")"
+          REMOTE="$(npm view coding-agent-relay version 2>/dev/null || true)"
+          echo "local=${LOCAL} remote=${REMOTE:-none}"
+          if [ -n "$REMOTE" ] && [ "$LOCAL" = "$REMOTE" ]; then
+            echo "already on npm"
+            exit 0
+          fi
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "NPM_TOKEN secret missing"
+            exit 1
+          fi
+          npm publish --access public

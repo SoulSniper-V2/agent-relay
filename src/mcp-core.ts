@@ -17,13 +17,13 @@ export const MCP_TOOLS = [
   {
     name: "relay_health",
     description:
-      "Hub status. login_ok is false until OTP email is live. If login_ok is false, tell the human the hub cannot send login codes. Do not invent a code.",
+      "Hub status. If login_ok is false, stop — OTP email is not live. If two_person is false, stop — Resend sandbox cannot mail a second person. Do not invent a code.",
     inputSchema: { type: "object", properties: {} },
   },
   {
     name: "relay_login_request",
     description:
-      "Start login: email a 6-digit code to the human. Call relay_health first; if login_ok is false, stop and tell the human. Then ask them for the code and call relay_login_verify. Never invent a code.",
+      "Start login: email a 6-digit code to the human. Call relay_health first; if login_ok or two_person is false, stop and tell the human. Then ask them for the code and call relay_login_verify. Never invent a code.",
     inputSchema: { type: "object", properties: { email: { type: "string" } }, required: ["email"] },
   },
   {
@@ -243,7 +243,8 @@ async function callTool(ctx: Ctx, name: string, args: Record<string, unknown>): 
       }
       {
         const remote = await api(ctx.hubUrl, ctx.token, false).request<Record<string, unknown>>("GET", "/health");
-        return { ...remote, hub: ctx.hubUrl, ...mailStatus(remote.email) };
+        const filled = remote.email == null ? { ...remote, ...mailStatus("off") } : remote;
+        return { ...filled, hub: ctx.hubUrl };
       }
 
     case "relay_login_request":
@@ -252,7 +253,7 @@ async function callTool(ctx: Ctx, name: string, args: Record<string, unknown>): 
       }
       if (store) {
         const issued = store.createLoginCode(String(args.email ?? ""));
-        let delivered: { delivered: "resend" | "file" };
+        let delivered: { delivered: "resend" | "smtp" | "file" };
         try {
           delivered = await sendMail(loginCodeMail(issued.email, issued.code));
         } catch (e) {

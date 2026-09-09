@@ -9,7 +9,8 @@ import { ApiError, RelayClient } from "../src/client.ts";
 import { Store } from "../src/store.ts";
 import { dispatchMcp } from "../src/mcp-core.ts";
 import { wrapUntrusted } from "../src/untrusted.ts";
-import { mailStatus } from "../src/email.ts";
+import { isResendSandbox, mailStatus, mailTransport } from "../src/email.ts";
+import { readSmtp } from "../src/smtp.ts";
 
 function tmpDb() {
   const dir = mkdtempSync(join(tmpdir(), "relay-"));
@@ -214,7 +215,75 @@ test("health treats a missing email field as mail off", () => {
   const missing = mailStatus(null);
   assert.equal(missing.email, "off");
   assert.equal(missing.login_ok, false);
+  assert.equal(missing.two_person, false);
   assert.match(missing.hint, /RELAY_RESEND_KEY/);
+});
+
+test("Resend onboarding from is sandbox and cannot mail a second person", () => {
+  const prevKey = process.env.RELAY_RESEND_KEY;
+  const prevFrom = process.env.RELAY_FROM_EMAIL;
+  const prevSmtp = process.env.RELAY_SMTP_URL;
+  const prevReq = process.env.RELAY_REQUIRE_EMAIL;
+  try {
+    delete process.env.RELAY_SMTP_URL;
+    delete process.env.RELAY_REQUIRE_EMAIL;
+    process.env.RELAY_RESEND_KEY = "re_test";
+    process.env.RELAY_FROM_EMAIL = "Agent Relay <onboarding@resend.dev>";
+    assert.equal(isResendSandbox(process.env.RELAY_FROM_EMAIL), true);
+    assert.equal(mailTransport(), "resend");
+    const s = mailStatus();
+    assert.equal(s.sandbox, true);
+    assert.equal(s.login_ok, true);
+    assert.equal(s.two_person, false);
+    assert.match(s.hint, /account email/);
+
+    process.env.RELAY_FROM_EMAIL = "Agent Relay <relay@theiragent.com>";
+    assert.equal(isResendSandbox(process.env.RELAY_FROM_EMAIL), false);
+    const live = mailStatus();
+    assert.equal(live.sandbox, false);
+    assert.equal(live.two_person, true);
+  } finally {
+    if (prevKey === undefined) delete process.env.RELAY_RESEND_KEY;
+    else process.env.RELAY_RESEND_KEY = prevKey;
+    if (prevFrom === undefined) delete process.env.RELAY_FROM_EMAIL;
+    else process.env.RELAY_FROM_EMAIL = prevFrom;
+    if (prevSmtp === undefined) delete process.env.RELAY_SMTP_URL;
+    else process.env.RELAY_SMTP_URL = prevSmtp;
+    if (prevReq === undefined) delete process.env.RELAY_REQUIRE_EMAIL;
+    else process.env.RELAY_REQUIRE_EMAIL = prevReq;
+  }
+});
+
+test("SMTP config is preferred over Resend sandbox", () => {
+  const prev = {
+    key: process.env.RELAY_RESEND_KEY,
+    from: process.env.RELAY_FROM_EMAIL,
+    smtp: process.env.RELAY_SMTP_URL,
+    req: process.env.RELAY_REQUIRE_EMAIL,
+  };
+  try {
+    delete process.env.RELAY_REQUIRE_EMAIL;
+    process.env.RELAY_RESEND_KEY = "re_test";
+    process.env.RELAY_FROM_EMAIL = "Me <warush23@gmail.com>";
+    process.env.RELAY_SMTP_URL = "smtps://warush23%40gmail.com:app-pass@smtp.gmail.com:465";
+    assert.equal(mailTransport(), "smtp");
+    const s = mailStatus();
+    assert.equal(s.email, "smtp");
+    assert.equal(s.two_person, true);
+    const auth = readSmtp();
+    assert.equal(auth?.host, "smtp.gmail.com");
+    assert.equal(auth?.user, "warush23@gmail.com");
+    assert.equal(auth?.pass, "app-pass");
+  } finally {
+    if (prev.key === undefined) delete process.env.RELAY_RESEND_KEY;
+    else process.env.RELAY_RESEND_KEY = prev.key;
+    if (prev.from === undefined) delete process.env.RELAY_FROM_EMAIL;
+    else process.env.RELAY_FROM_EMAIL = prev.from;
+    if (prev.smtp === undefined) delete process.env.RELAY_SMTP_URL;
+    else process.env.RELAY_SMTP_URL = prev.smtp;
+    if (prev.req === undefined) delete process.env.RELAY_REQUIRE_EMAIL;
+    else process.env.RELAY_REQUIRE_EMAIL = prev.req;
+  }
 });
 
 test("HTTP: invite, send, inbox, decide across two tokens", async () => {
@@ -536,4 +605,11 @@ test("MCP login never returns a PAT or OTP", async () => {
     rmSync(dir, { recursive: true, force: true });
     delete process.env.RELAY_MAILBOX_DIR;
   }
+});
+
+test("public site stays on Vercel and the hub stays on the VM", async () => {
+  const { HOSTED_HUB, SITE } = await import("../src/hosted.ts");
+  assert.equal(HOSTED_HUB, "https://35.211.23.64.sslip.io");
+  assert.equal(SITE, "https://agent-relay-eight.vercel.app");
+  assert.notEqual(HOSTED_HUB, SITE);
 });

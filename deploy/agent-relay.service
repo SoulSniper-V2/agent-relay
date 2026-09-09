@@ -1,0 +1,24 @@
+[Unit]
+Description=agent-relay hub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/agent-relay.env
+Type=simple
+User=agent-relay
+Group=agent-relay
+WorkingDirectory=/opt/agent-relay
+Environment=NODE_ENV=production
+Environment=RELAY_PORT=8787
+Environment=RELAY_BIND=127.0.0.1
+Environment=RELAY_DB=/var/lib/agent-relay/hub.db
+Environment=RELAY_PUBLIC_URL=https://35.211.23.64.sslip.io
+Environment=RELAY_REQUIRE_EMAIL=1
+ExecStart=/usr/bin/node --experimental-sqlite --import tsx src/serve.ts
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

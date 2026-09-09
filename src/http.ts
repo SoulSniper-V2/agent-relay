@@ -53,10 +53,14 @@ function bearer(req: IncomingMessage): string | undefined {
 }
 
 function clientIp(req: IncomingMessage): string {
-  const fly = req.headers["fly-client-ip"];
-  if (typeof fly === "string" && fly.trim()) return fly.trim();
+  const real = req.headers["x-real-ip"];
+  if (typeof real === "string" && real.trim()) return real.trim();
   const xff = req.headers["x-forwarded-for"];
-  if (typeof xff === "string" && xff.trim()) return xff.split(",")[0]!.trim();
+  if (typeof xff === "string" && xff.trim()) {
+    const hops = xff.split(",").map((s) => s.trim()).filter(Boolean);
+    // Caddy appends the connecting client. Prefer that hop over a spoofed left-most XFF.
+    if (hops.length) return hops[hops.length - 1]!;
+  }
   return req.socket.remoteAddress ?? "unknown";
 }
 
@@ -108,6 +112,7 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
   const publicUrl = opts.publicUrl ?? "";
   const bus = opts.bus;
   const authIpOk = makeLimiter(10, 10 * 60 * 1000);
+  const verifyIpOk = makeLimiter(30, 10 * 60 * 1000);
 
   const server = createServer(async (req, res) => {
     try {
@@ -206,7 +211,7 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
         }
         const b = await jsonBody(req);
         const issued = store.createLoginCode(String(b.email ?? ""));
-        let delivered: { delivered: "resend" | "file" };
+        let delivered: { delivered: "resend" | "smtp" | "file" };
         try {
           delivered = await sendMail(loginCodeMail(issued.email, issued.code));
         } catch (e) {
@@ -220,7 +225,7 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
           expires_in_sec: 600,
           hint:
             delivered.delivered === "file"
-              ? "No SMTP configured. Code written to RELAY_MAILBOX_DIR (default ~/.agent-relay/mailbox). Ask the human to read that file and tell you the 6-digit code."
+              ? "Local file mailbox. Ask the human to read RELAY_MAILBOX_DIR (default ~/.agent-relay/mailbox) and tell you the 6-digit code."
               : "Code emailed. Ask the human to read their inbox and tell you the 6-digit code. Do not guess.",
         };
         if (process.env.RELAY_DEV_OTP === "1") payload.dev_code = issued.code;
@@ -229,6 +234,9 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
       }
 
       if (method === "POST" && p === "/v1/auth/verify") {
+        if (!verifyIpOk(clientIp(req))) {
+          throw new RelayError(429, "Too many login tries from this network. Try again later.");
+        }
         const b = await jsonBody(req);
         const result = store.verifyLogin(String(b.email ?? ""), String(b.code ?? ""));
         send(res, 200, {
@@ -505,7 +513,7 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
         return;
       }
       console.error(e);
-      send(res, 500, { error: e instanceof Error ? e.message : "Server error" });
+      send(res, 500, { error: "Server error" });
     }
   });
 

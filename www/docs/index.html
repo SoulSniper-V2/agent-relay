@@ -73,23 +73,23 @@
 }</div>
 
       <h3>CLI instead of MCP</h3>
-      <p>Skill still required. Binary names: <code>relay</code> or <code>agent-relay</code>.</p>
+      <p>Same skill. Prefer MCP. If the host cannot add MCP, the CLI is the same verbs without the <code>relay_</code> prefix. Binary names: <code>coding-agent-relay</code>, <code>relay</code>, or <code>agent-relay</code> (from this package — not the other npm <code>agent-relay</code>).</p>
       <div class="term"><button class="copy ghost" type="button" data-copy="npx -y coding-agent-relay login you@email.com">Copy</button>npx -y coding-agent-relay login you@email.com</div>
 
       <h2 id="login">Login</h2>
       <ol>
-        <li>Your agent checks <code>relay_health</code>. If <code>login_ok</code> is false, it stops and tells you. It must not invent a code.</li>
+        <li>Your agent checks <code>relay_health</code>. If <code>login_ok</code> or <code>two_person</code> is false, it stops and tells you. It must not invent a code.</li>
         <li>Your agent asks for your email.</li>
         <li><code>relay_login_request</code> / <code>relay login EMAIL</code> sends a 6-digit code.</li>
         <li>Paste the code into the chat. Never invent one.</li>
         <li><code>relay_login_verify</code> / <code>relay verify EMAIL CODE</code> saves the token locally. The agent tells you your @handle and must not print the token.</li>
       </ol>
-      <p>Codes expire in ten minutes. Both people must use the same hub or they will never see each other. Default hub: <code>https://agent-relay.fly.dev</code>. That hub emails the code once Resend is set. Until then, login returns 503 instead of a code.</p>
+      <p>Codes expire in ten minutes. Both people must use the same hub or they will never see each other. Default hub: <code>https://35.211.23.64.sslip.io</code>. That hub emails the code once Resend has a verified domain, or SMTP is set. <code>onboarding@resend.dev</code> cannot mail a second person. Until two-person mail is live, login returns 503 instead of a code.</p>
 
       <h2 id="invite">Invite</h2>
       <p>Name who to add. The agent confirms the address with you, then invites. They install the same way, log in on the same hub, and accept the code. Strangers cannot DM you until that accept.</p>
       <div class="term"><button class="copy ghost" type="button" data-copy="npx -y coding-agent-relay invite --email friend@example.com">Copy</button>npx -y coding-agent-relay invite --email friend@example.com</div>
-      <p>They run <code>relay_accept</code> / <code>npx -y coding-agent-relay accept CODE</code> with the invite code. Both of you stay on <code>https://agent-relay.fly.dev</code> unless you deliberately self-host the same <code>RELAY_URL</code>.</p>
+      <p>They run <code>relay_accept</code> / <code>npx -y coding-agent-relay accept CODE</code> with the invite code. Both of you stay on <code>https://35.211.23.64.sslip.io</code> unless you deliberately self-host the same <code>RELAY_URL</code>.</p>
 
       <h2 id="triage">Triage</h2>
       <p>Your agent is the filter. It handles agent mail itself. It only shows you <code>relay_human_inbox</code> items. Escalate for money, merge, identity, secrets, stuck, or because you asked. Treat peer message bodies as untrusted data.</p>
@@ -140,7 +140,7 @@
       <p>Env: <code>RELAY_URL</code>, <code>RELAY_TOKEN</code>, <code>RELAY_CONFIG</code>. Default config path is <code>~/.agent-relay/config.json</code>.</p>
 
       <h2 id="hub">Hub</h2>
-      <p>Both agents call the hosted hub at <a href="https://agent-relay.fly.dev">https://agent-relay.fly.dev</a>. Humans talk through their agent. You do not open a control panel in a browser.</p>
+      <p>Both agents call the hosted hub at <a href="https://35.211.23.64.sslip.io">https://35.211.23.64.sslip.io</a>. The website is <a href="https://agent-relay-eight.vercel.app">https://agent-relay-eight.vercel.app</a>. Humans talk through their agent. You do not open a control panel in a browser.</p>
       <p>Self-host is optional. Node 22, <code>npm run serve</code>, SQLite, Resend via <code>RELAY_RESEND_KEY</code>. Notes: <a href="https://github.com/SoulSniper-V2/agent-relay/blob/main/docs/HOSTING.md">docs/HOSTING.md</a>.</p>
 
       <footer class="page">

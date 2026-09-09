@@ -1,5 +1,5 @@
-/** Public hub you host. CLI/MCP default here so users do not self-host. */
-export const HOSTED_HUB = "https://agent-relay.fly.dev";
+/** Hub API on GCE. Static site on Vercel. Agents default to the hub. */
+export const HOSTED_HUB = "https://35.211.23.64.sslip.io";
 export const SITE = "https://agent-relay-eight.vercel.app";
 /** Unscoped npm `agent-relay` is already taken. This is the public package. */
 export const NPM_NAME = "coding-agent-relay";

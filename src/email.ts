@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { RelayError } from "./errors.ts";
+import { readSmtp, sendSmtp } from "./smtp.ts";
 
 export function normalizeEmail(email: string): string {
   const e = email.trim().toLowerCase();
@@ -12,57 +13,109 @@ export function normalizeEmail(email: string): string {
 }
 
 export type Mail = { to: string; subject: string; text: string };
-export type MailTransport = "resend" | "file" | "off";
+export type MailTransport = "resend" | "smtp" | "file" | "off";
+export type MailStatus = {
+  email: MailTransport;
+  login_ok: boolean;
+  sandbox: boolean;
+  two_person: boolean;
+  hint: string;
+};
+
+export function parseFromAddress(from: string): string {
+  const t = from.trim();
+  const m = t.match(/<([^>]+)>/);
+  return (m ? m[1] : t).trim().toLowerCase();
+}
+
+/** Resend's shared from can only deliver to the Resend account email, not a second person. */
+export function isResendSandbox(from: string): boolean {
+  return parseFromAddress(from).endsWith("@resend.dev");
+}
+
+function fromEnv(): string {
+  return process.env.RELAY_FROM_EMAIL?.trim() ?? "";
+}
 
 /** How this process delivers mail. Never include the key. */
 export function mailTransport(): MailTransport {
   const key = process.env.RELAY_RESEND_KEY;
-  const from = process.env.RELAY_FROM_EMAIL?.trim();
+  const from = fromEnv();
+  const smtp = readSmtp();
+  if (smtp && from) return "smtp";
   if (key && from) return "resend";
   if (key || process.env.RELAY_REQUIRE_EMAIL === "1") return "off";
   return "file";
 }
 
 /** Status agents should read before they try login. Missing `email` on old hubs is off. */
-export function mailStatus(email: unknown = mailTransport()): {
-  email: MailTransport;
-  login_ok: boolean;
-  hint: string;
-} {
-  const t: MailTransport = email === "resend" || email === "file" || email === "off" ? email : "off";
-  if (t === "resend") {
-    return { email: t, login_ok: true, hint: "OTP email is live. Ask the human for the 6-digit code. Do not invent one." };
+export function mailStatus(email: unknown = mailTransport()): MailStatus {
+  const t: MailTransport =
+    email === "resend" || email === "smtp" || email === "file" || email === "off" ? email : "off";
+  if (t === "off") {
+    return {
+      email: t,
+      login_ok: false,
+      sandbox: false,
+      two_person: false,
+      hint: "Hub is not sending login email. Two-person hosted login needs Resend with a verified domain (RELAY_RESEND_KEY + RELAY_FROM_EMAIL that is not @resend.dev) or SMTP (RELAY_SMTP_URL + RELAY_FROM_EMAIL). onboarding@resend.dev can only mail the Resend account owner. Do not invent a code.",
+    };
   }
   if (t === "file") {
     return {
       email: t,
       login_ok: true,
+      sandbox: false,
+      two_person: true,
       hint: "Local file mailbox. Ask the human to read RELAY_MAILBOX_DIR (default ~/.agent-relay/mailbox).",
+    };
+  }
+  if (t === "smtp") {
+    return {
+      email: t,
+      login_ok: true,
+      sandbox: false,
+      two_person: true,
+      hint: "OTP email is live over SMTP. Ask the human for the 6-digit code. Do not invent one.",
+    };
+  }
+  const sandbox = isResendSandbox(fromEnv());
+  if (sandbox) {
+    return {
+      email: t,
+      login_ok: true,
+      sandbox: true,
+      two_person: false,
+      hint: "Resend sandbox: onboarding@resend.dev can only mail the Resend account email. Two people cannot log in until RELAY_FROM_EMAIL uses a verified domain, or set SMTP. Do not invent a code.",
     };
   }
   return {
     email: t,
-    login_ok: false,
-    hint: "Hub is not sending login email. Tell the human: set Fly secrets RELAY_RESEND_KEY and RELAY_FROM_EMAIL. Until a domain is verified, From can be Agent Relay <onboarding@resend.dev>. Do not invent a code.",
+    login_ok: true,
+    sandbox: false,
+    two_person: true,
+    hint: "OTP email is live. Ask the human for the 6-digit code. Do not invent one.",
   };
 }
 
-export async function sendMail(mail: Mail): Promise<{ delivered: "resend" | "file" }> {
+export async function sendMail(mail: Mail): Promise<{ delivered: "resend" | "smtp" | "file" }> {
   const key = process.env.RELAY_RESEND_KEY;
-  const from = process.env.RELAY_FROM_EMAIL?.trim();
-  if (!key && process.env.RELAY_REQUIRE_EMAIL === "1") {
-    throw new RelayError(
-      503,
-      "This hub is not sending email yet. Tell the human: hosted mail needs Resend (RELAY_RESEND_KEY and RELAY_FROM_EMAIL).",
-    );
-  }
-  if (key) {
-    if (!from) {
+  const from = fromEnv();
+  const smtp = readSmtp();
+  const transport = mailTransport();
+  if (transport === "off") {
+    if (key && !from) {
       throw new RelayError(
         503,
-        "This hub has a Resend key but no RELAY_FROM_EMAIL. Set both Fly secrets. Until a domain is verified, From can be Agent Relay <onboarding@resend.dev>.",
+        "This hub has a Resend key but no RELAY_FROM_EMAIL. Set both on the hub. Two-person login needs a verified domain in From, not onboarding@resend.dev.",
       );
     }
+    throw new RelayError(
+      503,
+      "This hub is not sending email yet. Tell the human: hosted two-person mail needs Resend with a verified domain, or SMTP (RELAY_SMTP_URL + RELAY_FROM_EMAIL).",
+    );
+  }
+  if (transport === "resend") {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -75,10 +128,21 @@ export async function sendMail(mail: Mail): Promise<{ delivered: "resend" | "fil
       await res.text().catch(() => "");
       throw new RelayError(
         502,
-        "Resend rejected the mail. The from-address may be unverified. Do not invent a login code.",
+        isResendSandbox(from)
+          ? "Resend sandbox rejected the mail. onboarding@resend.dev can only mail the Resend account email. Verify a domain or use SMTP. Do not invent a login code."
+          : "Resend rejected the mail. The from-address may be unverified. Do not invent a login code.",
       );
     }
     return { delivered: "resend" };
+  }
+  if (transport === "smtp" && smtp && from) {
+    try {
+      await sendSmtp(smtp, { from, to: mail.to, subject: mail.subject, text: mail.text });
+    } catch (e) {
+      if (e instanceof RelayError) throw e;
+      throw new RelayError(502, "SMTP rejected the mail. Check RELAY_SMTP_URL and RELAY_FROM_EMAIL. Do not invent a login code.");
+    }
+    return { delivered: "smtp" };
   }
   const dir = process.env.RELAY_MAILBOX_DIR ?? join(homedir(), ".agent-relay", "mailbox");
   mkdirSync(dir, { recursive: true });

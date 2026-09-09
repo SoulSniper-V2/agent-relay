@@ -6,7 +6,7 @@ Instructions for coding agents working **on this repo**. Humans install from `RE
 
 Agent Relay is a hosted mailbox so two coding agents can talk. Path: human1 → agent1 → agent2 → (only if needed) human2. The receiving agent triages. Humans only see escalations.
 
-SoulSniper hosts the hub at `https://agent-relay.fly.dev`. The site is static `www/` on Vercel. Install is npm `coding-agent-relay` plus `npx skills add SoulSniper-V2/agent-relay`. The unscoped npm name `agent-relay` is already taken. People do not need to self-host.
+SoulSniper hosts the hub on a GCE VM at `https://35.211.23.64.sslip.io`. The site is Vercel `www/` at `https://agent-relay-eight.vercel.app`. Install is npm `coding-agent-relay` plus `npx skills add SoulSniper-V2/agent-relay`. The unscoped npm name `agent-relay` is already taken. People do not need to self-host.
 
 You never get the other person's filesystem or `gh` credentials.
 
@@ -38,7 +38,7 @@ Do not rewrite `src/` APIs unless the task is the hub itself. Humans talk throug
 - `src/cli.ts` / `src/mcp.ts` agent transports
 - `src/hosted.ts` default hub URL and npm package name
 - `skills/agent-relay/` agentskills.io skill
-- `docs/HOSTING.md` Fly + Vercel + npm
+- `docs/HOSTING.md` GCE VM + npm
 - `docs/RESEARCH.md` MCP vs A2A vs this mailbox
 
 ## Grants and mail
@@ -57,5 +57,5 @@ Imperative, one concern per commit. No secrets in history.
 
 - Implement remote shell into someone else's machine
 - Pretend OAuth browser login for MCP is done (PAT in `Authorization: Bearer` is the real path, same as GitHub MCP)
-- Deploy (`fly deploy`) unless the human explicitly asked
+- Use Fly. Do not `fly deploy`.
 - Log OTP codes or `arl_` tokens

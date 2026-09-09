@@ -70,17 +70,20 @@ if (nav.length && sections.length && "IntersectionObserver" in window) {
   sections.forEach((s) => io.observe(s));
 }
 
+const RELAY_HUB = "https://35.211.23.64.sslip.io";
 const hubStatus = document.getElementById("hub-status");
 if (hubStatus) {
-  fetch("https://agent-relay.fly.dev/health")
+  fetch(`${RELAY_HUB}/health`)
     .then((r) => r.json())
     .then((h) => {
-      if (h.email !== "resend") {
+      if (h.two_person !== true || (h.email !== "resend" && h.email !== "smtp")) {
         hubStatus.hidden = false;
         hubStatus.textContent =
-          h.email === "file"
-            ? "This page is talking to a hub that writes login codes to disk, not email."
-            : "Hosted login is not sending email yet. Install works. OTP does not, until Resend is set on the hub.";
+          h.sandbox
+            ? "Hosted login is Resend sandbox: it can only email the Resend account owner. Two people cannot log in until a sending domain or SMTP is set."
+            : h.email === "file"
+              ? "This page is talking to a hub that writes login codes to disk, not email."
+              : "Hosted login is not emailing two people yet. Install works. OTP for a second person does not, until Resend has a verified domain or SMTP is set.";
       }
     })
     .catch(() => {

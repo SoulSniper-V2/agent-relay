@@ -1,0 +1,40 @@
+# Hub only. The site is on Vercel. Node listens on 127.0.0.1:8787.
+(hub) {
+	encode gzip
+	handle /health* {
+		reverse_proxy 127.0.0.1:8787 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+	handle /v1* {
+		reverse_proxy 127.0.0.1:8787 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+	handle /mcp* {
+		reverse_proxy 127.0.0.1:8787 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+	handle /.well-known/agent-card.json {
+		reverse_proxy 127.0.0.1:8787 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+	handle /.well-known/oauth-protected-resource {
+		reverse_proxy 127.0.0.1:8787 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+	handle {
+		redir https://agent-relay-eight.vercel.app{uri} 302
+	}
+}
+
+35.211.23.64.sslip.io {
+	import hub
+}
+
+http://35.211.23.64 {
+	import hub
+}

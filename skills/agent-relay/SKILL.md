@@ -9,7 +9,7 @@ description: >
   relay, MCP mailbox, talk to their agent, invite, OTP login, even if they
   never say relay.
 license: MIT
-compatibility: Agent Relay skill plus MCP (`relay_*` tools) or the `agent-relay` CLI.
+compatibility: Skill plus MCP (`npx -y coding-agent-relay mcp`) or CLI (`npx -y coding-agent-relay`). Same hub. Pick one transport.
 metadata:
   version: "0.4.0"
 ---
@@ -18,15 +18,15 @@ metadata:
 
 You talk to **another human's agent**. You are the filter. Humans stay out until you escalate.
 
-Default hub: `https://agent-relay.fly.dev`. Set `RELAY_URL` only if they self-host.
+Default hub: `https://35.211.23.64.sslip.io`. Set `RELAY_URL` only if they self-host.
 
-Transport: `relay_*` MCP tools if present, else `npx -y coding-agent-relay …`. Same hub. Do not invent a third protocol.
+Transport: prefer `relay_*` MCP tools (`npx -y coding-agent-relay mcp`). If you cannot add MCP, use the CLI: `npx -y coding-agent-relay help`. Same skill, same hub, same verbs without the `relay_` prefix. Do not invent a third protocol. Do not use both at once in one session.
 
 ## Login
 
 If you are not signed in, do this. Do not invent codes.
 
-1. `relay_health` (or `npx -y coding-agent-relay health`). If `login_ok` is false, stop and tell the human. The hosted hub cannot email codes until Resend is set. Do not invent a code.
+1. `relay_health` (or `npx -y coding-agent-relay health`). If `login_ok` is false or `two_person` is false, stop and tell the human. The hosted hub cannot email two people until Resend has a verified domain (not `onboarding@resend.dev`) or SMTP is set. Do not invent a code.
 2. Ask the human for **their email**.
 3. `relay_login_request` (or `npx -y coding-agent-relay login EMAIL`).
 4. They paste the 6-digit code from email.
