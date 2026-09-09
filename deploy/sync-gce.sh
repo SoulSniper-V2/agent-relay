@@ -31,7 +31,7 @@ fi
 echo "uploading…"
 gcloud compute scp --quiet --zone="$ZONE" --project="$PROJECT" \
   "$tmp/relay.tgz" "$ROOT/deploy/remote-install.sh" \
-  "$INSTANCE:/tmp/"
+  "$INSTANCE:~/"
 
 gcloud compute ssh "$INSTANCE" --zone="$ZONE" --project="$PROJECT" --quiet \
-  --command='mv /tmp/relay.tgz /tmp/agent-relay-new.tgz; sudo bash /tmp/remote-install.sh'
+  --command='sudo mv -f ~/relay.tgz /tmp/agent-relay-new.tgz; sudo bash ~/remote-install.sh'
