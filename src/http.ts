@@ -212,6 +212,9 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
       }
 
       if (method === "POST" && p === "/v1/register") {
+        if (process.env.RELAY_ALLOW_OPEN_REGISTER !== "1") {
+          throw new RelayError(403, "Open register is off. Use email login: POST /v1/auth/request.");
+        }
         const b = await jsonBody(req);
         const result = store.register(String(b.handle ?? ""), b.name ? String(b.name) : undefined);
         send(res, 201, { user: result.user, agent: result.agent, token: result.token });

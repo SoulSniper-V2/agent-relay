@@ -149,17 +149,7 @@ Env: RELAY_URL  RELAY_TOKEN  RELAY_CONFIG  RELAY_PORT  RELAY_DB
     }
 
     if (cmd === "signup") {
-      const handle = argv[1];
-      if (!handle) fail("Usage: relay signup <handle>  (prefer: relay login <email>)");
-      const name = flag(argv, "name") ?? handle;
-      const { cfg, api } = client();
-      const res = await api.request<{ user: { handle: string }; token: string }>("POST", "/v1/register", {
-        handle,
-        name,
-      });
-      saveConfig({ url: cfg.url, handle: res.user.handle, token: res.token });
-      out({ ok: true, handle: res.user.handle, hub: cfg.url, saved: "credentials in RELAY_CONFIG" });
-      return;
+      fail("Signup without email is off. Use: relay login <email>");
     }
 
     if (cmd === "sync") {

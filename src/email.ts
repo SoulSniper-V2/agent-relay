@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { RelayError } from "./errors.ts";
 
 export function normalizeEmail(email: string): string {
   const e = email.trim().toLowerCase();
@@ -14,6 +15,12 @@ export type Mail = { to: string; subject: string; text: string };
 
 export async function sendMail(mail: Mail): Promise<{ delivered: "resend" | "file" }> {
   const key = process.env.RELAY_RESEND_KEY;
+  if (!key && process.env.RELAY_REQUIRE_EMAIL === "1") {
+    throw new RelayError(
+      503,
+      "This hub is not sending login email yet. Set RELAY_RESEND_KEY and RELAY_FROM_EMAIL.",
+    );
+  }
   if (key) {
     const from = process.env.RELAY_FROM_EMAIL ?? "relay@localhost";
     const res = await fetch("https://api.resend.com/emails", {

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { openDb } from "../src/db.ts";
 import { createRelayServer } from "../src/http.ts";
-import { RelayClient } from "../src/client.ts";
+import { ApiError, RelayClient } from "../src/client.ts";
 import { Store } from "../src/store.ts";
 import { dispatchMcp } from "../src/mcp-core.ts";
 import { wrapUntrusted } from "../src/untrusted.ts";
@@ -116,23 +116,25 @@ test("peer body is wrapped as untrusted data", () => {
 
 test("HTTP: invite, send, inbox, decide across two tokens", async () => {
   const { dir, db } = tmpDb();
+  process.env.RELAY_DEV_OTP = "1";
+  process.env.RELAY_MAILBOX_DIR = join(dir, "mail");
   const store = new Store(openDb(db));
   const server = createRelayServer(store);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const addr = server.address();
   const port = typeof addr === "object" && addr ? addr.port : 0;
   const url = `http://127.0.0.1:${port}`;
+  async function login(email: string) {
+    const api = new RelayClient(url);
+    const req = await api.request<{ email: string; dev_code: string }>("POST", "/v1/auth/request", { email });
+    return api.request<{ user: { handle: string }; token: string }>("POST", "/v1/auth/verify", {
+      email: req.email,
+      code: req.dev_code,
+    });
+  }
   try {
-    const alice = await new RelayClient(url).request<{ user: { handle: string }; token: string }>(
-      "POST",
-      "/v1/register",
-      { handle: "alice" },
-    );
-    const bob = await new RelayClient(url).request<{ user: { handle: string }; token: string }>(
-      "POST",
-      "/v1/register",
-      { handle: "bob" },
-    );
+    const alice = await login("alice@test.dev");
+    const bob = await login("bob@test.dev");
     const aliceApi = new RelayClient(url, alice.token);
     const bobApi = new RelayClient(url, bob.token);
     const inv = await aliceApi.request<{ code: string }>("POST", "/v1/invites", {});
@@ -148,6 +150,50 @@ test("HTTP: invite, send, inbox, decide across two tokens", async () => {
   } finally {
     await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())));
     rmSync(dir, { recursive: true, force: true });
+    delete process.env.RELAY_DEV_OTP;
+    delete process.env.RELAY_MAILBOX_DIR;
+  }
+});
+
+test("open register is off", async () => {
+  const { dir, db } = tmpDb();
+  const store = new Store(openDb(db));
+  const server = createRelayServer(store);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const addr = server.address();
+  const port = typeof addr === "object" && addr ? addr.port : 0;
+  try {
+    await assert.rejects(
+      () => new RelayClient(`http://127.0.0.1:${port}`).request("POST", "/v1/register", { handle: "eve" }),
+      (e: unknown) => e instanceof ApiError && e.status === 403,
+    );
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("hub without Resend refuses login when email is required", async () => {
+  const { dir, db } = tmpDb();
+  process.env.RELAY_REQUIRE_EMAIL = "1";
+  delete process.env.RELAY_RESEND_KEY;
+  const store = new Store(openDb(db));
+  const server = createRelayServer(store);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const addr = server.address();
+  const port = typeof addr === "object" && addr ? addr.port : 0;
+  try {
+    await assert.rejects(
+      () =>
+        new RelayClient(`http://127.0.0.1:${port}`).request("POST", "/v1/auth/request", {
+          email: "sam@example.com",
+        }),
+      (e: unknown) => e instanceof ApiError && e.status === 503,
+    );
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())));
+    rmSync(dir, { recursive: true, force: true });
+    delete process.env.RELAY_REQUIRE_EMAIL;
   }
 });
 

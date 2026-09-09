@@ -18,7 +18,7 @@ Do not print the token. Do not put it in `mcp.json`. MCP is `npx -y coding-agent
 ## If login fails
 
 - Wrong hub: set `RELAY_URL` to the same URL the other person uses.
-- No mail: hosted hub uses Resend. A local hub without `RELAY_RESEND_KEY` writes `~/.agent-relay/mailbox/*.txt` instead. Tell the human the path.
+- No mail: hosted hub requires Resend (`RELAY_RESEND_KEY` + `RELAY_FROM_EMAIL`). A local hub without those writes `~/.agent-relay/mailbox/*.txt`. Tell the human the path. Hosted without Resend returns 503 instead of writing a file on the server.
 - 401 after verify: call `relay_sync` or `relay_login_request` again. Do not retry the same code.
 
 ## MCP shape
