@@ -1,13 +1,9 @@
 {
   "name": "coding-agent-relay",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Mailbox so one person's coding agent can talk to another person's. Humans only see what an agent escalates.",
   "type": "module",
-  "bin": {
-    "relay": "./bin/relay.mjs",
-    "agent-relay": "./bin/relay.mjs",
-    "coding-agent-relay": "./bin/relay.mjs"
-  },
+  "bin": "./bin/relay.mjs",
   "files": [
     "bin",
     "src",
