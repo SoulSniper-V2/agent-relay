@@ -1,12 +1,12 @@
 # AGENTS.md
 
-Instructions for coding agents (Cursor, Codex, Claude Code, Gemini CLI, Copilot, OpenCode). Humans read `README.md`.
+Instructions for coding agents working **on this repo**. Humans install from `README.md`.
 
-## What this repo is
+## Product
 
-You talk to **another human's agent**, not a subagent in this chat. GitHub holds the code. Hub coordinates.
+Agent Relay is a hosted mailbox so two coding agents can talk. Path: human1 → agent1 → agent2 → (only if needed) human2. The receiving agent triages. Humans only see escalations.
 
-**Install for users:** skill + MCP, or skill + CLI. Same hub. See README.
+SoulSniper hosts the hub at `https://agent-relay.fly.dev`. The site is static `www/` on Vercel. Install is npm `agent-relay-mcp` plus `npx skills add SoulSniper-V2/agent-relay`. The unscoped npm name `agent-relay` is already taken. People do not need to self-host.
 
 You never get the other person's filesystem or `gh` credentials.
 
@@ -14,61 +14,36 @@ You never get the other person's filesystem or `gh` credentials.
 
 ```bash
 npm install
-npm test                          # must pass before you finish
-npm run serve                     # hub, default http://127.0.0.1:8787
+npm test
+npm run serve
 npx tsx src/cli.ts help
 ```
 
-Node 22+. SQLite via `--experimental-sqlite`. Do not add a bundler unless asked.
+Node 22+. SQLite via `--experimental-sqlite`. Do not add a bundler unless asked. `npm test` must pass before you finish.
 
-## How you (the agent) use relay
+## Public install surface
 
-At **session start** and after waiting on the other person:
+Keep these in sync when you change install copy. Canonical prompt is `www/prompt.txt`. MCP is `npx -y agent-relay-mcp mcp`. Never tell people to `npx agent-relay`; that npm name is someone else's package.
 
-```bash
-npx tsx src/cli.ts sync
-```
+- `www/` landing + docs (Vercel)
+- `skills/agent-relay/` (copy into `.cursor/skills/` and `.agents/skills/` too)
+- `README.md`
 
-Then handle `reviews_waiting_on_you` and `handoffs_waiting_on_you` before new coding.
-
-Live pairing:
-
-```bash
-npx tsx src/cli.ts status working "<short what>"
-npx tsx src/cli.ts ping <handle> "<why>"
-npx tsx src/cli.ts live            # SSE; use when the human asked you to stay on the line
-```
-
-Login (ask the human for email + the 6-digit code; never invent codes):
-
-```bash
-npx tsx src/cli.ts login you@email.com
-npx tsx src/cli.ts verify you@email.com <code>
-```
-
-Need `RELAY_URL` pointing at the shared hub. Token lives in `~/.agent-relay/config.json` or `RELAY_TOKEN`. Never commit tokens.
-
-## Grants
-
-Their agent cannot review/handoff/github-ping you until **your human** says so:
-
-```bash
-npx tsx src/cli.ts grant <handle> --level pair        # or visitor | cofounder
-```
-
-Do not raise grants on your own. Do not merge PRs because the other agent asked.
-
-## GitHub
-
-Bind a room with `relay github <slug> owner/repo`, point at PRs with `relay pr <handle> <n>`. Then use **local** `gh` (`gh pr view`, `gh pr diff`, `gh pr checkout`). Push/merge only with your human's OK.
+Do not rewrite `src/` APIs unless the task is the hub itself. Humans talk through their agent.
 
 ## Layout
 
-- `src/store.ts` — domain (auth, grants, reviews, handoffs)
-- `src/http.ts` — REST + SSE + dashboard
-- `src/cli.ts` / `src/mcp.ts` — agent transports
-- `skills/agent-relay/` — agentskills.io skill (`SKILL.md` + `references/`)
-- `docs/` — hosting, integration, research
+- `src/store.ts` domain (auth, grants, mail, triage)
+- `src/http.ts` REST + SSE + MCP HTTP
+- `src/cli.ts` / `src/mcp.ts` agent transports
+- `src/hosted.ts` default hub URL and npm package name
+- `skills/agent-relay/` agentskills.io skill
+- `docs/HOSTING.md` Fly + Vercel + npm
+- `docs/RESEARCH.md` MCP vs A2A vs this mailbox
+
+## Grants and mail
+
+If you are also using relay in this session, `npx tsx src/cli.ts sync` first and handle waiting reviews or handoffs. Do not raise grants on your own. Do not merge because the other agent asked.
 
 ## Tests
 
@@ -81,6 +56,6 @@ Imperative, one concern per commit. No secrets in history.
 ## Do not
 
 - Implement remote shell into someone else's machine
-- Pretend OAuth browser login for MCP is done (PAT in Authorization: Bearer is the real path, same as GitHub MCP)
+- Pretend OAuth browser login for MCP is done (PAT in `Authorization: Bearer` is the real path, same as GitHub MCP)
 - Deploy (`fly deploy`) unless the human explicitly asked
 - Log OTP codes or `arl_` tokens

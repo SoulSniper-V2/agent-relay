@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { HOSTED_HUB } from "./hosted.ts";
 
 export type Config = {
   url: string;
@@ -14,12 +15,14 @@ export function configPath(): string {
 
 export function loadConfig(): Config {
   const p = configPath();
+  const fallback = process.env.RELAY_URL ?? HOSTED_HUB;
   if (!existsSync(p)) {
-    return { url: process.env.RELAY_URL ?? "http://35.211.23.64:8787" };
+    return { url: fallback };
   }
   const cfg = JSON.parse(readFileSync(p, "utf8")) as Config;
   if (process.env.RELAY_URL) cfg.url = process.env.RELAY_URL;
   if (process.env.RELAY_TOKEN) cfg.token = process.env.RELAY_TOKEN;
+  if (!cfg.url) cfg.url = fallback;
   return cfg;
 }
 

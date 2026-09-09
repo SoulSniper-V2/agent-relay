@@ -1,14 +1,21 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { RelayError, Store, type User } from "./store.ts";
-import { apiHomeHtml, dashboardHtml } from "./dashboard.ts";
+import { RelayError, Store } from "./store.ts";
 import { sendMail } from "./email.ts";
+import { HOSTED_HUB, SITE } from "./hosted.ts";
 import type { RelayBus } from "./bus.ts";
 import { dispatchMcp, type Rpc } from "./mcp-core.ts";
+import { NAME, VERSION } from "./version.ts";
+import type { Actor } from "./types.ts";
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on("data", (c) => chunks.push(c));
+    req.on("data", (c: Buffer) => {
+      chunks.push(c);
+      if (chunks.reduce((n, x) => n + x.length, 0) > 256_000) {
+        reject(new RelayError(413, "Body too large."));
+      }
+    });
     req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
     req.on("error", reject);
   });
@@ -29,7 +36,7 @@ function send(res: ServerResponse, status: number, data: unknown, extra: Record<
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": "*",
-    "access-control-allow-headers": "authorization, content-type",
+    "access-control-allow-headers": "authorization, content-type, mcp-session-id",
     "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
     ...extra,
   });
@@ -41,7 +48,37 @@ function pathOf(req: IncomingMessage): URL {
 }
 
 function bearer(req: IncomingMessage): string | undefined {
-  return req.headers.authorization;
+  const h = req.headers.authorization;
+  return typeof h === "string" ? h : undefined;
+}
+
+function agentCard(publicUrl: string) {
+  const url = publicUrl || "http://127.0.0.1:8787";
+  return {
+    protocolVersion: "0.2.9",
+    name: "Agent Relay",
+    description:
+      "Mailbox switchboard for humans and coding agents. Messages land on an agent; that agent decides whether a human ever sees them.",
+    url: `${url}/mcp`,
+    provider: { organization: "agent-relay" },
+    version: VERSION,
+    capabilities: { streaming: true },
+    defaultInputModes: ["text/plain", "application/json"],
+    defaultOutputModes: ["application/json"],
+    skills: [
+      {
+        id: "mailbox",
+        name: "Mailbox",
+        description: "Send and triage messages between agents. Escalate to a human only when needed.",
+        tags: ["messaging", "hitl", "mcp"],
+      },
+    ],
+    extra: {
+      rest: `${url}/v1`,
+      mcp: `${url}/mcp`,
+      note: "This hub is a messaging switchboard, not an A2A task-executing agent. Use MCP tools or REST. A2A Agent Cards are advertised for discovery.",
+    },
+  };
 }
 
 export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?: RelayBus } = {}) {
@@ -58,15 +95,15 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
       const p = url.pathname.replace(/\/$/, "") || "/";
       const method = req.method ?? "GET";
 
-      if (method === "GET" && p === "/") {
-        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-        res.end(apiHomeHtml());
-        return;
-      }
-
-      if (method === "GET" && p === "/app") {
-        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-        res.end(dashboardHtml(publicUrl));
+      if (method === "GET" && (p === "/" || p === "/app")) {
+        send(res, 200, {
+          name: NAME,
+          version: VERSION,
+          mcp: "POST /mcp",
+          site: SITE,
+          hub: publicUrl || HOSTED_HUB,
+          login: "POST /v1/auth/request then POST /v1/auth/verify",
+        });
         return;
       }
 
@@ -76,13 +113,18 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
           authorization_servers: [],
           bearer_methods_supported: ["header"],
           resource_documentation:
-            "Agent-relay MCP: POST /mcp with Authorization: Bearer <PAT>. Mint a token after email login on /.",
+            "Agent Relay MCP: POST /mcp with Authorization: Bearer <PAT>. Mint a token after email login.",
         });
         return;
       }
 
+      if (method === "GET" && p === "/.well-known/agent-card.json") {
+        send(res, 200, agentCard(publicUrl));
+        return;
+      }
+
       if (method === "GET" && p === "/health") {
-        send(res, 200, { ok: true, name: "agent-relay" });
+        send(res, 200, { ok: true, name: NAME, version: VERSION });
         return;
       }
 
@@ -109,13 +151,13 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
         const proto = publicUrl.startsWith("https") ? "https" : "http";
         const hubUrl = `${proto}://${host}`;
         const token = bearer(req)?.replace(/^Bearer\s+/i, "").trim();
-        const out = await dispatchMcp(msg, { hubUrl, token });
+        const out = await dispatchMcp(msg, { hubUrl, token, store });
         if (!out) {
           res.writeHead(202, { "content-type": "application/json" });
           res.end();
           return;
         }
-        send(res, out.error ? 200 : 200, out);
+        send(res, 200, out);
         return;
       }
 
@@ -128,7 +170,7 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
           text: [
             `Your login code is: ${issued.code}`,
             "",
-            "Give this code to your agent (or paste it on the dashboard).",
+            "Give this code to your agent, or paste it on the hub dashboard.",
             "It expires in 10 minutes. Do not forward it.",
             publicUrl ? `Dashboard: ${publicUrl}` : "",
           ].join("\n"),
@@ -140,7 +182,7 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
           expires_in_sec: 600,
           hint:
             delivered.delivered === "file"
-              ? "No SMTP configured. Code written to RELAY_MAILBOX_DIR (default ~/.agent-relay/mailbox). Ask the human to read that email/file and tell you the 6-digit code."
+              ? "No SMTP configured. Code written to RELAY_MAILBOX_DIR (default ~/.agent-relay/mailbox). Ask the human to read that file and tell you the 6-digit code."
               : "Code emailed. Ask the human to read their inbox and tell you the 6-digit code. Do not guess.",
         };
         if (process.env.RELAY_DEV_OTP === "1") payload.dev_code = issued.code;
@@ -152,8 +194,11 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
         const b = await jsonBody(req);
         const result = store.verifyLogin(String(b.email ?? ""), String(b.code ?? ""));
         send(res, 200, {
-          ...result,
-          hint: "Save token as RELAY_TOKEN. Do not commit it. Mint extra tokens on the dashboard for MCP/cloud agents.",
+          user: result.user,
+          agent: result.agent,
+          token: result.token,
+          is_new: result.is_new,
+          hint: "Save token as RELAY_TOKEN. Do not commit it. Mint extra tokens on the dashboard for other agents.",
         });
         return;
       }
@@ -161,14 +206,19 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
       if (method === "POST" && p === "/v1/register") {
         const b = await jsonBody(req);
         const result = store.register(String(b.handle ?? ""), b.name ? String(b.name) : undefined);
-        send(res, 201, result);
+        send(res, 201, { user: result.user, agent: result.agent, token: result.token });
         return;
       }
 
-      const need = (): User => store.auth(bearer(req));
+      const need = (): Actor => store.auth(bearer(req));
 
       if (method === "GET" && p === "/v1/me") {
         send(res, 200, store.snapshot(need()));
+        return;
+      }
+
+      if (method === "GET" && p === "/v1/sync") {
+        send(res, 200, store.sync(need()));
         return;
       }
 
@@ -185,9 +235,9 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
         if (email) {
           await sendMail({
             to: email,
-            subject: `@${me.handle} invited your agent to agent-relay`,
+            subject: `@${me.user.handle} invited your agent to agent-relay`,
             text: [
-              `@${me.handle} wants your agents to talk.`,
+              `@${me.user.handle} wants your agents to talk — humans stay out until an agent escalates.`,
               "",
               `1. Open ${publicUrl || "the hub"} or tell your agent: relay login ${email}`,
               `2. After login: relay accept ${inv.code}`,
@@ -217,19 +267,19 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
 
       if (method === "GET" && p === "/v1/inbox") {
         const me = need();
-        const unread = url.searchParams.get("unread") === "1";
+        const pending = url.searchParams.get("pending") !== "0" && url.searchParams.get("unread") !== "0";
         const after = url.searchParams.get("after");
         send(res, 200, {
           messages: store.inbox(me, {
-            unread,
+            pending,
             after: after ? Number(after) : undefined,
           }),
         });
         return;
       }
 
-      if (method === "GET" && p === "/v1/sync") {
-        send(res, 200, store.sync(need()));
+      if (method === "GET" && p === "/v1/human/inbox") {
+        send(res, 200, { items: store.humanInbox(need()) });
         return;
       }
 
@@ -243,21 +293,57 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
       if (method === "POST" && p === "/v1/messages") {
         const me = need();
         const b = await jsonBody(req);
-        const body = String(b.body ?? "");
-        const reply = b.reply_to ? String(b.reply_to) : undefined;
-        const kind = b.kind ? String(b.kind) : "chat";
-        if (b.room) {
-          send(res, 201, store.sendRoom(me, String(b.room), body, kind, reply));
-          return;
-        }
-        send(res, 201, store.sendDm(me, String(b.to ?? ""), body, kind, reply));
+        send(
+          res,
+          201,
+          store.send(me, {
+            to: b.to ? String(b.to) : undefined,
+            room: b.room ? String(b.room) : undefined,
+            body: String(b.body ?? ""),
+            intent: b.intent ? String(b.intent) : undefined,
+            needs_human: Boolean(b.needs_human),
+            reply_to: b.reply_to ? String(b.reply_to) : undefined,
+            from_role: b.from_role === "human" ? "human" : "agent",
+            payload: b.payload && typeof b.payload === "object" ? (b.payload as Record<string, unknown>) : undefined,
+          }),
+        );
         return;
       }
 
-      if (method === "POST" && p.startsWith("/v1/messages/") && p.endsWith("/ack")) {
+      if (method === "POST" && p.match(/^\/v1\/messages\/[^/]+\/decide$/)) {
         const me = need();
         const messageId = p.split("/")[3];
-        send(res, 200, store.ack(me, messageId));
+        const b = await jsonBody(req);
+        send(
+          res,
+          200,
+          store.decide(me, messageId, {
+            action: String(b.action ?? "") as "handle" | "escalate" | "dismiss" | "reply",
+            reason: b.reason != null ? String(b.reason) : undefined,
+            reply: b.reply != null ? String(b.reply) : undefined,
+            from_role: b.from_role === "human" ? "human" : "agent",
+          }),
+        );
+        return;
+      }
+
+      if (method === "POST" && p.match(/^\/v1\/messages\/[^/]+\/ack$/)) {
+        const me = need();
+        const messageId = p.split("/")[3];
+        send(res, 200, store.decide(me, messageId, { action: "handle" }));
+        return;
+      }
+
+      if (method === "POST" && p.match(/^\/v1\/messages\/[^/]+\/resolve$/)) {
+        const me = need();
+        const messageId = p.split("/")[3];
+        const b = await jsonBody(req);
+        send(res, 200, store.resolveHuman(me, messageId, { reply: b.reply != null ? String(b.reply) : undefined }));
+        return;
+      }
+
+      if (method === "GET" && p.startsWith("/v1/threads/")) {
+        send(res, 200, { messages: store.thread(need(), p.split("/")[3]) });
         return;
       }
 
@@ -297,28 +383,15 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
         return;
       }
 
-      if (method === "GET" && p === "/v1/plans") {
-        const me = need();
-        send(res, 200, { plans: store.listPlans(me, url.searchParams.get("target") ?? "") });
+      if (method === "GET" && p === "/v1/agents") {
+        send(res, 200, { agents: store.listAgents(need()) });
         return;
       }
 
-      if (method === "POST" && p === "/v1/plans") {
+      if (method === "POST" && p === "/v1/agents") {
         const me = need();
         const b = await jsonBody(req);
-        send(res, 201, store.createPlan(me, String(b.target ?? ""), String(b.title ?? ""), String(b.body ?? "")));
-        return;
-      }
-
-      if (method === "PATCH" && p.startsWith("/v1/plans/")) {
-        const me = need();
-        const planId = p.split("/")[3];
-        const b = await jsonBody(req);
-        send(res, 200, store.updatePlan(me, planId, {
-          title: b.title != null ? String(b.title) : undefined,
-          body: b.body != null ? String(b.body) : undefined,
-          status: b.status != null ? String(b.status) : undefined,
-        }));
+        send(res, 201, store.createAgent(me, String(b.slug ?? ""), b.name != null ? String(b.name) : undefined));
         return;
       }
 
@@ -330,7 +403,7 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
       if (method === "POST" && p === "/v1/tokens") {
         const me = need();
         const b = await jsonBody(req);
-        send(res, 201, store.issueToken(me, String(b.name ?? "agent")));
+        send(res, 201, store.mintToken(me, String(b.name ?? "agent"), b.agent != null ? String(b.agent) : undefined));
         return;
       }
 
@@ -351,13 +424,15 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
           connection: "keep-alive",
           "access-control-allow-origin": "*",
         });
-        res.write(`data: ${JSON.stringify({ type: "hello", handle: me.handle, at: Date.now() })}\n\n`);
-        const unsub = bus.subscribe(me.id, (ev) => {
+        res.write(
+          `data: ${JSON.stringify({ type: "hello", address: `@${me.user.handle}/${me.agent.slug}`, at: Date.now() })}\n\n`,
+        );
+        const unsub = bus.subscribe(me.user.id, (ev) => {
           res.write(`data: ${JSON.stringify(ev)}\n\n`);
         });
         const ping = setInterval(() => {
           res.write(`: ping ${Date.now()}\n\n`);
-        }, 15000);
+        }, 15_000);
         req.on("close", () => {
           unsub();
           clearInterval(ping);
@@ -368,10 +443,15 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
       if (method === "POST" && p === "/v1/grants") {
         const me = need();
         const b = await jsonBody(req);
-        send(res, 200, store.setGrants(me, String(b.handle ?? ""), {
-          caps: b.caps as string | string[] | undefined,
-          level: b.level != null ? String(b.level) : undefined,
-        }));
+        send(
+          res,
+          200,
+          store.setGrants(me, String(b.handle ?? ""), {
+            caps: b.caps as string | string[] | undefined,
+            level: b.level != null ? String(b.level) : undefined,
+            inbound_policy: b.inbound_policy != null ? String(b.inbound_policy) : undefined,
+          }),
+        );
         return;
       }
 
@@ -386,77 +466,6 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
         const me = need();
         const b = await jsonBody(req);
         send(res, 200, store.setCard(me, String(b.card ?? "")));
-        return;
-      }
-
-      if (method === "GET" && p === "/v1/reviews") {
-        send(res, 200, { reviews: store.listReviews(need()) });
-        return;
-      }
-
-      if (method === "POST" && p === "/v1/reviews") {
-        const me = need();
-        const b = await jsonBody(req);
-        send(res, 201, store.offerReview(me, String(b.to ?? ""), {
-          path: String(b.path ?? ""),
-          title: b.title != null ? String(b.title) : undefined,
-          body: String(b.body ?? ""),
-          ask: b.ask != null ? String(b.ask) : undefined,
-        }));
-        return;
-      }
-
-      if (method === "GET" && p.startsWith("/v1/reviews/")) {
-        send(res, 200, store.getReview(need(), p.split("/")[3]));
-        return;
-      }
-
-      if (method === "POST" && p.match(/^\/v1\/reviews\/[^/]+\/verdict$/)) {
-        const me = need();
-        const b = await jsonBody(req);
-        send(res, 200, store.verdictReview(me, p.split("/")[3], String(b.verdict ?? ""), String(b.comment ?? "")));
-        return;
-      }
-
-      if (method === "GET" && p === "/v1/handoffs") {
-        send(res, 200, { handoffs: store.listHandoffs(need()) });
-        return;
-      }
-
-      if (method === "POST" && p === "/v1/handoffs") {
-        const me = need();
-        const b = await jsonBody(req);
-        send(res, 201, store.offerHandoff(me, String(b.to ?? ""), {
-          title: String(b.title ?? ""),
-          body: b.body != null ? String(b.body) : undefined,
-          branch: b.branch != null ? String(b.branch) : undefined,
-          pr: b.pr != null ? String(b.pr) : undefined,
-          acceptance: b.acceptance != null ? String(b.acceptance) : undefined,
-        }));
-        return;
-      }
-
-      if (method === "POST" && p.startsWith("/v1/handoffs/")) {
-        const me = need();
-        const b = await jsonBody(req);
-        send(res, 200, store.updateHandoff(me, p.split("/")[3], {
-          status: b.status != null ? String(b.status) : undefined,
-          note: b.note != null ? String(b.note) : undefined,
-        }));
-        return;
-      }
-
-      if (method === "POST" && p.match(/^\/v1\/rooms\/[^/]+\/github$/)) {
-        const me = need();
-        const b = await jsonBody(req);
-        send(res, 200, store.setRoomGithub(me, p.split("/")[3], String(b.repo ?? "")));
-        return;
-      }
-
-      if (method === "POST" && p === "/v1/github/pr") {
-        const me = need();
-        const b = await jsonBody(req);
-        send(res, 201, store.pointPr(me, String(b.to ?? ""), String(b.pr ?? ""), String(b.ask ?? "")));
         return;
       }
 

@@ -1,13 +1,15 @@
-export const CAPS = ["message", "memory", "presence", "review", "handoff", "github"] as const;
+export const CAPS = ["message", "memory"] as const;
 export type Cap = (typeof CAPS)[number];
+
+export const POLICIES = ["triage", "always_escalate", "silent"] as const;
 
 export const LEVELS: Record<string, Cap[]> = {
   visitor: ["message"],
-  pair: ["message", "memory", "presence", "review"],
-  cofounder: ["message", "memory", "presence", "review", "handoff", "github"],
+  pair: ["message", "memory"],
+  cofounder: ["message", "memory"],
 };
 
-export const DEFAULT_CAPS: Cap[] = ["message", "memory", "presence"];
+export const DEFAULT_CAPS: Cap[] = ["message", "memory"];
 
 export function parseCaps(raw: string | string[] | undefined, fallback: Cap[] = DEFAULT_CAPS): Cap[] {
   const parts = Array.isArray(raw)

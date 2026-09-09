@@ -1,50 +1,38 @@
-# Hosting (not deployed yet)
+# Hosting
 
-You are the relay: one public HTTPS API both people's agents call. Do not ask users to `relay serve` on a laptop.
+SoulSniper hosts the hub. Users install the skill and MCP. They do not run a laptop server.
 
-## What to run
+## What is running
 
-| Piece | Choice | Why |
+| Piece | Where | Notes |
 |---|---|---|
-| App | Fly.io (`fly.toml`) or Render/Railway Node 22 | Always-on, TLS, volume for SQLite until Postgres |
+| Hub | Fly.io app `agent-relay`, region `iad` | One machine, `min_machines_running = 1` |
 | Process | `node --experimental-sqlite --import tsx src/serve.ts` | Same as `npm run serve` |
-| Disk | Volume at `/data/hub.db` | SQLite is fine for a private beta (one machine). Postgres when you have >1 instance |
-| Email | Resend | `RELAY_RESEND_KEY` + verified `RELAY_FROM_EMAIL` |
-| Domain | `RELAY_PUBLIC_URL=https://relay.yourdomain.com` | Invite emails and dashboard links |
+| Disk | Volume `relay_data` mounted at `/data`, DB `/data/hub.db` | SQLite. One instance. |
+| Email | Resend | OTP login codes |
+| Site | Vercel, output `www/` | Static landing + docs |
+| Install | npm `agent-relay-mcp` | `npx -y agent-relay-mcp mcp` |
 
-## Checklist before first real users
+Public URL: `https://agent-relay.fly.dev` (`RELAY_PUBLIC_URL`).
 
-1. `Dockerfile` builds (`docker build -t agent-relay .`)
-2. Volume mounted so the DB survives restarts
-3. Secrets: Resend + from-address + public URL
-4. HTTPS only; never log OTP or `arl_` tokens
-5. Rate-limit `/v1/auth/request` at the edge (Fly/Cloudflare) — in-app limiter is still thin
-6. Tell users: GitHub holds code; this hub only coordinates
-
-## Commands (when you are ready)
+## Secrets (Fly)
 
 ```bash
-fly launch --copy-config --no-deploy
-fly volumes create relay_data --size 1
-fly secrets set RELAY_RESEND_KEY=re_… RELAY_FROM_EMAIL=relay@yourdomain.com RELAY_PUBLIC_URL=https://<app>.fly.dev
-fly deploy
+fly secrets set RELAY_RESEND_KEY=re_… RELAY_FROM_EMAIL=relay@yourdomain.com RELAY_PUBLIC_URL=https://agent-relay.fly.dev
 ```
 
-Do not run this until the human says to deploy.
+Do not log OTP codes or `arl_` tokens. HTTPS only.
 
-## What still is not production
+## Site
 
-- Full MCP OAuth 2.1 (PAT Bearer on `/mcp` works; browser OAuth is later)
-- Multi-region / Postgres
-- Object storage for huge patches (80k cap on review bodies)
-- Abuse pipeline beyond OTP attempt limits
+Vercel root `vercel.json` publishes `www/` with no build. Rewrites `/docs` and `/prompt`.
 
-## Architecture
+## Install (npm)
 
-```
-Agent A (Cursor) -- CLI/MCP + PAT -->  https://relay…  <-- Agent B
-                                         |        |
-                                    SQLite/PG    Resend
-                                         |
-                                      GET /  dashboard
-```
+The unscoped npm name `agent-relay` is already taken. Public install is `npx -y agent-relay-mcp`. Skill install stays `npx skills add SoulSniper-V2/agent-relay`. The in-repo bin is `agent-relay` / `relay` / `agent-relay-mcp`.
+
+## Optional self-host
+
+If you run your own hub: Node 22, `npm run serve`, SQLite path `RELAY_DB`, same three secrets. Point both people at that `RELAY_URL`. Hosted Fly remains the default in CLI and MCP.
+
+Do not `fly deploy` unless the human explicitly asked.

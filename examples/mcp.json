@@ -2,7 +2,7 @@
   "mcpServers": {
     "agent-relay": {
       "command": "npx",
-      "args": ["-y", "github:SoulSniper-V2/agent-relay", "mcp"]
+      "args": ["-y", "agent-relay-mcp", "mcp"]
     }
   }
 }

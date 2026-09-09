@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# Two-agent CLI smoke test against a real hub process.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIR="$(mktemp -d)"
-# Bind 0 then read the port from health is hard; pick an unused high port.
 PORT="${PORT:-$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')}"
 export RELAY_DEV_OTP=1
 export RELAY_MAILBOX_DIR="$DIR/mail"
@@ -41,34 +39,13 @@ AH=$(jget "d['handle']" <"$DIR/alice.json")
 BH=$(jget "d['handle']" <"$DIR/bob.json")
 bob accept "$INV" >/dev/null
 
-# Default post-invite: message ok, review denied until grant
 alice send "$BH" "hello from alice cli" >/dev/null
-bob sync | python3 -c "import json,sys; d=json.load(sys.stdin); assert any('hello from alice' in m['body'] for m in d['unread']), d"
+bob sync | python3 -c "import json,sys; d=json.load(sys.stdin); assert any('hello from alice' in m['body'] for m in d['pending']), d"
+bob human-inbox | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['items']==[] or len(d['items'])==0, d"
 
-echo "fn demo() {}" >"$DIR/snippet.ts"
-set +e
-alice review offer "$BH" --file "$DIR/snippet.ts" --ask "look?" >"$DIR/rev-fail.json" 2>"$DIR/rev-fail.err"
-REV_RC=$?
-set -e
-test "$REV_RC" -ne 0
-grep -qi "grant\|not allowed\|forbidden\|review\|403" "$DIR/rev-fail.err" "$DIR/rev-fail.json" || {
-  echo "expected review to be denied before grant" >&2
-  cat "$DIR/rev-fail.err" "$DIR/rev-fail.json" >&2
-  exit 1
-}
-
-alice grant "$BH" --level cofounder >/dev/null
-bob grant "$AH" --level cofounder >/dev/null
-
-alice review offer "$BH" --file "$DIR/snippet.ts" --path src/demo.ts --ask "look?" >"$DIR/rev.json"
-RID=$(jget "d['id']" <"$DIR/rev.json")
-bob review list | python3 -c "import json,sys; d=json.load(sys.stdin); assert any(r['id']=='$RID' for r in d['reviews']), d"
-bob review verdict "$RID" lgtm --comment "ok" >/dev/null
-
-alice handoff offer "$BH" "Ship the demo" --body "take snippet.ts" --branch cursor/demo >/dev/null
-HID=$(bob handoff list | jget "d['handoffs'][0]['id']")
-bob handoff take "$HID" >/dev/null
-bob handoff done "$HID" --note "done" >/dev/null
+MID=$(bob inbox | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['messages'][-1]['id'])")
+bob decide "$MID" escalate --reason "needs a human" >/dev/null
+bob human-inbox | python3 -c "import json,sys; d=json.load(sys.stdin); assert len(d['items'])==1, d"
 
 alice ping "$BH" "please sync" >/dev/null
 alice whoami | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['me']['handle']=='$AH'"

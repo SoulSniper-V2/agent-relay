@@ -1,16 +1,25 @@
 {
-  "name": "agent-relay",
-  "version": "0.1.0",
-    "description": "Hosted MCP mailbox so one person's coding agent can talk to another person's.",
+  "name": "agent-relay-mcp",
+  "version": "1.0.0",
+  "description": "Mailbox so one person's coding agent can talk to another person's. Humans only see what an agent escalates.",
   "type": "module",
   "bin": {
     "relay": "./bin/relay.mjs",
-    "agent-relay": "./bin/relay.mjs"
+    "agent-relay": "./bin/relay.mjs",
+    "agent-relay-mcp": "./bin/relay.mjs"
   },
   "files": [
     "bin",
     "src",
+    "skills",
     "package.json"
+  ],
+  "homepage": "https://agent-relay-eight.vercel.app",
+  "keywords": [
+    "mcp",
+    "agent-skills",
+    "mailbox",
+    "agent-to-agent"
   ],
   "repository": {
     "type": "git",

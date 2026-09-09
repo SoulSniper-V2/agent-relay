@@ -1,58 +1,28 @@
-# Auth: how this is supposed to work
+# Auth
 
-This is not a guess. It follows published MCP, GitHub MCP, Agent Skills, and OAuth device-flow docs.
+Default hub is `https://agent-relay.fly.dev`. Both people must use the same hub or they never see each other.
 
-## Three layers (do not collapse them)
+## Login (this is the product path)
 
-| Layer | What it authorizes | What we use |
-|---|---|---|
-| **Email OTP** | The *human* owns this mailbox | `relay login` / dashboard. Agent-native. Code is short-lived. |
-| **Personal access token** | This *agent process* calling the hub | `arl_…` in `RELAY_TOKEN` or `Authorization: Bearer`. GitHub MCP’s PAT pattern. |
-| **MCP OAuth 2.1** | HTTP MCP client ↔ MCP server (Cursor `/mcp` browser dance) | Spec-required for *remote* MCP. We document PATs first (same as GitHub’s Cursor install). Full AS+PKCE is later. |
+The human owns the mailbox. You run login in chat.
 
-MCP authorization ([spec 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization/)): HTTP transports only; OAuth 2.1 + PKCE; RFC 9728 protected resource metadata; `Authorization: Bearer`. **stdio MCP is not covered** — hosts inject env vars (GitHub: `GITHUB_PERSONAL_ACCESS_TOKEN`).
+1. Ask for their email.
+2. `relay_login_request` or `npx -y agent-relay-mcp login EMAIL`. A 6-digit code goes to that inbox. Codes expire in ten minutes. Never guess.
+3. They paste the code. Never invent one.
+4. `relay_login_verify` or `npx -y agent-relay-mcp verify EMAIL CODE`. The token is written to `~/.agent-relay/config.json` on **this machine**.
 
-GitHub’s official server ([github/github-mcp-server](https://github.com/github/github-mcp-server)): remote can use OAuth *or* `Authorization: Bearer <PAT>` in Cursor `headers`. Local stdio uses env PAT. PAT takes precedence over OAuth.
+Do not print the token. Do not put it in `mcp.json`. MCP is `npx -y agent-relay-mcp mcp` with no secrets in the config.
 
-SEP-1036 (URL elicitation): **passwords and long-lived secrets must not be collected through the model**. OTP is a compromise the human chose so the agent can finish login. Prefer: human mints a token on `/` and pastes `RELAY_TOKEN` into env (never into the prompt if they can avoid it). If they dictate a 6-digit code, use it once via `relay verify` and do not echo it later.
+`RELAY_TOKEN` and `RELAY_URL` override the config file when set. Use them for a cloud agent that cannot keep `~/.agent-relay`. Still do not paste the token into chat.
 
-Device flow analogue: [GitHub OAuth device flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow) — user confirms out of band, CLI polls. We invert it: email carries the code, human tells the agent.
+## If login fails
 
-## Hub 401
+- Wrong hub: set `RELAY_URL` to the same URL the other person uses.
+- No mail: hosted hub uses Resend. A local hub without `RELAY_RESEND_KEY` writes `~/.agent-relay/mailbox/*.txt` instead. Tell the human the path.
+- 401 after verify: call `relay_sync` or `relay_login_request` again. Do not retry the same code.
 
-Unauthenticated `/v1/*` returns `WWW-Authenticate: Bearer`. `GET /.well-known/oauth-protected-resource` explains PAT-bearer (honest: no authorization_servers yet).
+## MCP shape
 
-## MCP config (Cursor)
+stdio, like GitHub's local MCP. Hosts inject env. HTTP Bearer on `/mcp` exists for the hub. Do not collect a long-lived secret through the model if login already saved one.
 
-stdio (like GitHub local):
-
-```json
-{
-  "mcpServers": {
-    "agent-relay": {
-      "command": "npx",
-      "args": ["tsx", "src/mcp.ts"],
-      "env": { "RELAY_URL": "https://hub.example", "RELAY_TOKEN": "<arl_…>" }
-    }
-  }
-}
-```
-
-Remote HTTP (what you publish):
-
-```json
-{
-  "mcpServers": {
-    "agent-relay": {
-      "url": "https://hub.example/mcp",
-      "headers": { "Authorization": "Bearer <arl_…>" }
-    }
-  }
-}
-```
-
-POST JSON-RPC to `/mcp`. GET `/mcp` is 405 (no SSE GET yet). Cursor may require HTTPS for remote MCP.
-
-## SMTP
-
-If `RELAY_RESEND_KEY` is set, mail goes through Resend. Otherwise the hub writes `~/.agent-relay/mailbox/*.txt` and logs the path. Tell the human that.
+OTP through chat is the compromise so you can finish login. Use the code once. Do not echo it later.

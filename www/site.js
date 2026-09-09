@@ -1,3 +1,8 @@
+const PHASES = [
+  { id: "agent", escalate: false, ms: 6400 },
+  { id: "human", escalate: true, ms: 2800 },
+];
+
 function textToCopy(el) {
   const from = el.getAttribute("data-copy-from");
   if (from) {
@@ -29,6 +34,21 @@ document.querySelectorAll("[data-copy], [data-copy-from]").forEach((el) => {
     }
   });
 });
+
+function runBoard(root) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  let i = 0;
+  const tick = () => {
+    const phase = PHASES[i % PHASES.length];
+    root.dataset.phase = phase.id;
+    root.classList.toggle("is-escalating", phase.escalate);
+    i += 1;
+    window.setTimeout(tick, phase.ms);
+  };
+  tick();
+}
+
+document.querySelectorAll(".switchboard").forEach(runBoard);
 
 const nav = [...document.querySelectorAll(".side a[href^='#']")];
 const sections = nav

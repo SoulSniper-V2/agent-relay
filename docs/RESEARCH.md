@@ -1,55 +1,31 @@
-# Sources (read, not summarized from memory)
+# Why a mailbox
 
-## MCP
+Coding agents already speak MCP (tools) and a shell. They do not, as a default, speak A2A Agent Cards to a friend's runtime. Agent Relay is the missing mailbox those harnesses can call today.
 
-- Spec index: https://modelcontextprotocol.io/llms.txt
-- Authorization: https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization
-- AS discovery / RFC 9728: https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization/authorization-server-discovery
-- Tutorial: https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/authorization
-- Security BCP (confused deputy, token passthrough forbidden, stdio proxy notes): https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices
-- Streamable HTTP: https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http
-- Remote servers: https://modelcontextprotocol.io/docs/2026-07-28/develop/connect-remote-servers
-- Build with Agent Skills (remote HTTP default for cloud APIs; OAuth because redirects): https://modelcontextprotocol.io/docs/2026-07-28/develop/build-with-agent-skills
-- SEP-1036 URL elicitation (secrets out-of-band, not through the model): https://modelcontextprotocol.io/seps/1036-url-mode-elicitation-for-secure-out-of-band-intera
-- Claude Code MCP (HTTP recommended for remote; OAuth via `/mcp`): https://code.claude.com/docs/en/mcp.md
+## Three layers (do not collapse them)
 
-## Agent Skills
+**MCP is agent to tool.** The server is passive. The client is the coding agent. Cursor, Claude Code, and Codex install this as stdio MCP (`npx -y agent-relay-mcp mcp`) or as a CLI. Redis's writeup of the split: MCP when you control the tool, A2A when you do not control the other runtime. [redis.io/blog/mcp-vs-a2a-which-protocol-do-you-need](https://redis.io/blog/mcp-vs-a2a-which-protocol-do-you-need/)
 
-- Spec: https://agentskills.io/specification.md (name/description constraints, progressive disclosure, scripts/, references/, keep SKILL.md < 500 lines)
-- Best practices: https://agentskills.io/skill-creation/best-practices.md (gotchas, defaults not menus, procedures, scripts for repeated logic)
-- Scripts for agents: https://agentskills.io/skill-creation/using-scripts.md (no TTY prompts, JSON stdout, --help)
-- Descriptions: https://agentskills.io/skill-creation/optimizing-descriptions.md (imperative, pushy when-to-use, 1024 char cap)
-- Anthropic skill-creator: https://github.com/anthropics/skills/tree/main/skills/skill-creator
-- MCP official plugin skills: https://github.com/anthropics/claude-plugins-official/tree/main/plugins/mcp-server-dev
+**A2A is opaque task delegation across an ownership boundary.** Agent Cards, task objects, a peer you do not run. IBM ACP merged into A2A (2025). Linux Foundation / AAIF treat MCP and A2A as stacked, not rivals. KodeKloud, Tyk, and AAIF use the same layering. A2A's own site says it is not Slack: [a2a-protocol.org](https://a2a-protocol.org/latest/)
 
-## How production MCP auth actually ships
+**This product is agent to agent mail.** Both peers are MCP clients of one hub. Identity is people (email OTP), not a workspace token. GitHub stays the repo. There is no shared disk. The receiving agent triages. The last hop to a human stays dark until escalate.
 
-- GitHub MCP README (OAuth *or* PAT Bearer header; stdio env `GITHUB_PERSONAL_ACCESS_TOKEN`; PAT wins): https://github.com/github/github-mcp-server
-- GitHub Cursor install (explicitly: GitHub remote currently wants a PAT in Cursor `headers.Authorization`): https://github.com/github/github-mcp-server/blob/HEAD/docs/installation-guides/install-cursor.md
-- Cursor header vs Claude `authorization_token`: https://github.com/github/github-mcp-server/issues/647
-- GitHub OAuth device flow (out-of-band user confirm): https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow
+Building "an MCP server whose only job is to be A2A" is the wrong layer. An A2A adapter (Agent Card pointing at the same mailbox) can wait. The first product has to match what Cursor and Claude Code actually speak.
 
-## MCP vs A2A (layering, not a bake-off)
+## Triage is the product
 
-- Redis: MCP is agent→tool (passive server); A2A is agent→agent across an ownership boundary. Use A2A when you do not control the other runtime. https://redis.io/blog/mcp-vs-a2a-which-protocol-do-you-need/
-- Same layering: KodeKloud 2026, Tyk, AAIF (MCP + A2A under Linux Foundation). IBM ACP merged into A2A (2025).
-- Coding agents (Cursor, Claude Code, Codex) already speak **MCP stdio / CLI**. They do **not** currently expose an A2A Agent Card as the default way a friend's agent reaches them.
-- Implication for this repo: a **hub + MCP/CLI tools** is how those agents actually join today. An A2A adapter (Agent Card pointing at the same mailbox) is a later interoperability layer, not the first product. Building “an MCP server whose only job is to be A2A” would be the wrong layer (KodeKloud: if you are coordinating other agents, that is A2A’s job — here the *peers* are still MCP clients of a shared mailbox, because that is what the harnesses are).
+Wanted path: human1 → agent1 → agent2. Not human1 → Slack DM → human2 pastes into agent2.
 
-## Closest products (checked Aug 2026)
+Escalate only for money, merge, identity, secrets, stuck, or because they asked. `relay_decide` is handle / reply / dismiss / escalate. `relay_human_inbox` is the only list to show the human. Humans talk through their agent.
 
-### OpenAgents Workspace (closest)
+Giving a machine an agent account, then letting it handle the mail, is the same shape.
 
-- Docs: https://openagents.org/docs/en/workspace/what-is-workspace
-- Cross-user **does exist**: share a workspace token; teammate `agn workspace join`; both agent pools appear in one Slack-like hub (channels, DMs, @mentions, shared files/browser).
-- Protocol: OpenAgents Network Model (ONM) + their **Launcher** (`agn`). MCP/A2A are mentioned for self-hosted networks, not as the default Cursor/Claude install.
-- Difference we still occupy: **no custom daemon**. Identity is **people** (email OTP) not a workspace token. **Grants** (visitor/pair/cofounder) are first-class. **GitHub remains the repo** — we do not share a disk or browser. Install is `SKILL.md` + `relay` CLI / stdio MCP.
+## Spec pointers
 
-### Others
+- MCP spec and authorization (HTTP Bearer, stdio is host-injected env): [modelcontextprotocol.io/llms.txt](https://modelcontextprotocol.io/llms.txt)
+- Agent Skills (name, description, progressive disclosure, SKILL.md under 500 lines): [agentskills.io/specification.md](https://agentskills.io/specification.md)
+- GitHub MCP ships PAT Bearer in Cursor today, OAuth later: [github/github-mcp-server](https://github.com/github/github-mcp-server)
 
-- Local multi-agent MCP / “Agent Teams” (Claude Code): same-user JSON mailboxes + poll, not cross-account identity.
-- Ledgenter-class same-user state: not two humans.
+## Closest neighbor
 
-## Product implication
-
-Agent-native email OTP + dashboard-minted PATs matches how humans already wire GitHub MCP. Full MCP OAuth 2.1 is the right *next* step for a hosted HTTP `/mcp` URL so Cursor can do a browser login without pasting secrets into chat. Do not collect long-lived tokens via the model if the dashboard can mint them instead (SEP-1036). Until Streamable HTTP MCP exists, the dashboard must only emit **stdio** snippets (tested: `GET /mcp` returns 501).
+OpenAgents Workspace can join two people in one hub, but install is their launcher and a workspace token. Difference we occupy: no custom daemon, email identity, grants, GitHub remains the repo, install is skill + `agent-relay` MCP.

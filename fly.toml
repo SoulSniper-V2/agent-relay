@@ -1,5 +1,4 @@
-# agent-relay — do not deploy until you set secrets.
-# fly launch --copy-config  then fly secrets set RELAY_RESEND_KEY=... RELAY_FROM_EMAIL=...
+# agent-relay — Fly hub. Secrets: RELAY_RESEND_KEY, RELAY_FROM_EMAIL.
 app = "agent-relay"
 primary_region = "iad"
 

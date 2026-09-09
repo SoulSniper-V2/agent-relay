@@ -25,16 +25,6 @@ export function now(): number {
   return Date.now();
 }
 
-export function normalizeHandle(handle: string): string {
-  const h = handle.trim().toLowerCase().replace(/^@/, "");
-  if (!/^[a-z0-9][a-z0-9_-]{1,31}$/.test(h)) {
-    throw new Error(
-      "Handle must be 2–32 chars: letters, numbers, _ or - (start with a letter or number).",
-    );
-  }
-  return h;
-}
-
 export function dmScope(a: string, b: string): string {
   return a < b ? `dm:${a}:${b}` : `dm:${b}:${a}`;
 }
