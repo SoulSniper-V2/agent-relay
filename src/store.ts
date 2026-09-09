@@ -815,6 +815,19 @@ export class Store {
     }
     const ts = now();
     if (action === "escalate") {
+      const original = this.db.prepare("SELECT from_user FROM messages WHERE id = ?").get(messageId) as
+        | { from_user: string }
+        | undefined;
+      const fromUser = original ? this.getUser(original.from_user) : undefined;
+      if (fromUser) {
+        const { inbound_policy } = this.grantsBetween(me.user.id, fromUser.id);
+        if (inbound_policy === "silent") {
+          throw new RelayError(
+            403,
+            `Inbound policy for @${fromUser.handle} is silent. Handle or dismiss; do not escalate.`,
+          );
+        }
+      }
       const reason = (spec.reason ?? "").trim() || "agent asked the human to look";
       this.db
         .prepare(
@@ -868,7 +881,7 @@ export class Store {
     return { message: this.hydrate(row, me.user.id, me.agent.id), reply };
   }
 
-  /** Human dashboard: resolve an escalation after reading / answering. */
+  /** Close an escalation after the human answers through their agent. */
   resolveHuman(me: Actor, messageId: string, spec: { reply?: string }) {
     const d = this.db
       .prepare("SELECT * FROM deliveries WHERE message_id = ? AND user_id = ? AND visibility = 'human'")

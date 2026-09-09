@@ -87,6 +87,43 @@ test("strangers cannot DM until they accept an invite", () => {
   }
 });
 
+test("silent inbound policy blocks escalate", () => {
+  const { dir, db } = tmpDb();
+  try {
+    const store = new Store(openDb(db));
+    const alice = store.register("alice");
+    const bob = store.register("bob");
+    store.acceptInvite(bob.actor, store.createInvite(alice.actor).code);
+    store.setGrants(bob.actor, "alice", { inbound_policy: "silent" });
+    const sent = store.send(alice.actor, { to: "bob", body: "please merge PR #12" });
+    assert.equal(store.humanInbox(bob.actor).length, 0);
+    assert.throws(
+      () => store.decide(bob.actor, sent.id, { action: "escalate", reason: "merge" }),
+      /silent/,
+    );
+    store.decide(bob.actor, sent.id, { action: "handle" });
+    assert.equal(store.humanInbox(bob.actor).length, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("visitor grant cannot write shared memory", () => {
+  const { dir, db } = tmpDb();
+  try {
+    const store = new Store(openDb(db));
+    const alice = store.register("alice");
+    const bob = store.register("bob");
+    store.acceptInvite(bob.actor, store.createInvite(alice.actor).code);
+    store.setGrants(alice.actor, "bob", { level: "visitor" });
+    assert.throws(() => store.remember(bob.actor, "alice", "secret", "nope"), /memory/);
+    store.send(bob.actor, { to: "alice", body: "hi" });
+    assert.equal(store.inbox(alice.actor, { pending: true }).some((m) => m.body === "hi"), true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("shared memory after a pair grant", () => {
   const { dir, db } = tmpDb();
   try {

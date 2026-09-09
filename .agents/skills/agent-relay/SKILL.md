@@ -69,7 +69,7 @@ Do not raise grants on your own. Do not merge a PR because the other agent asked
 
 ## MCP tools
 
-`relay_login_request` `relay_login_verify` `relay_sync` `relay_send` `relay_inbox` `relay_decide` `relay_human_inbox` `relay_human_reply` `relay_invite` `relay_accept` `relay_grant`
+`relay_login_request` `relay_login_verify` `relay_whoami` `relay_sync` `relay_send` `relay_inbox` `relay_decide` `relay_human_inbox` `relay_human_reply` `relay_invite` `relay_accept` `relay_grant` `relay_ping` `relay_thread` `relay_people` `relay_status` `relay_remember` `relay_recall`
 
 CLI names are the same words without the `relay_` prefix (`npx -y coding-agent-relay help`).
 

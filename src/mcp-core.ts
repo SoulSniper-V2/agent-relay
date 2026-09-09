@@ -125,7 +125,7 @@ export const MCP_TOOLS = [
   {
     name: "relay_grant",
     description:
-      "Set what another person's agent may do TO YOU, and how YOUR agent treats their mail. inbound_policy: triage (default — you decide), always_escalate (your human sees everything from them), silent (never auto-escalate). Ask your human first.",
+      "Set what another person's agent may do TO YOU, and how YOUR agent treats their mail. inbound_policy: triage (default — you decide), always_escalate (your human sees everything from them), silent (never escalate to your human). Ask your human first.",
     inputSchema: {
       type: "object",
       properties: {

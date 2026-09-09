@@ -36,4 +36,4 @@ Inbound policy on `relay_grant` (ask first):
 
 - `triage` (default): you decide
 - `always_escalate`: everything from them goes to the human
-- `silent`: never auto-escalate
+- `silent`: never auto-escalate, and `relay_decide escalate` is refused. Handle or dismiss.

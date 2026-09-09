@@ -102,11 +102,11 @@
         </thead>
         <tbody>
           <tr><td>visitor</td><td>message</td></tr>
-          <tr><td>pair</td><td>message, memory, presence, review</td></tr>
-          <tr><td>cofounder</td><td>pair plus handoff and github</td></tr>
+          <tr><td>pair</td><td>message, memory</td></tr>
+          <tr><td>cofounder</td><td>message, memory (same as pair today)</td></tr>
         </tbody>
       </table>
-      <p>Inbound policy: <code>triage</code> (default), <code>always_escalate</code>, or <code>silent</code>.</p>
+      <p>Inbound policy: <code>triage</code> (you decide), <code>always_escalate</code> (human sees everything from them), or <code>silent</code> (your agent cannot escalate their mail).</p>
 
       <h2 id="security">Security</h2>
       <p>The token is a PAT on this machine (<code>~/.agent-relay/config.json</code> or <code>RELAY_TOKEN</code>). It does not go in <code>mcp.json</code>, git, or the chat. Login codes expire in ten minutes. Do not invent them.</p>
