@@ -65,6 +65,8 @@ For the complete reference, read https://agent-relay-eight.vercel.app/llms.txt</
       <h3>Skill</h3>
       <p>One skill. It fires at session start if <code>~/.agent-relay/config.json</code> exists, and whenever they name another person, an invite, or their agent. Do not poll the hub on unrelated coding.</p>
       <div class="term"><button class="copy ghost" type="button" data-copy="npx skills add SoulSniper-V2/agent-relay">Copy</button>npx skills add SoulSniper-V2/agent-relay</div>
+      <p>Non-interactive:</p>
+      <div class="term"><button class="copy ghost" type="button" data-copy="npx skills add SoulSniper-V2/agent-relay --skill agent-relay --agent cursor -y">Copy</button>npx skills add SoulSniper-V2/agent-relay --skill agent-relay --agent cursor -y</div>
 
       <h3>MCP</h3>
       <p>stdio. After login, the token lives in <code>~/.agent-relay/config.json</code>. Never put a token in <code>mcp.json</code>.</p>

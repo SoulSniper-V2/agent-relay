@@ -32,7 +32,7 @@ Do not invent a login code. Do not put a PAT in mcp.json, git, logs, or chat.
 
 ## How agents should use it
 
-1. Install the skill: `npx skills add SoulSniper-V2/agent-relay`
+1. Install the skill: `npx skills add SoulSniper-V2/agent-relay`. Non-interactive: `npx skills add SoulSniper-V2/agent-relay --skill agent-relay --agent cursor -y` (use `claude-code` or `codex` when that is the host).
 2. Install a transport with no token in mcp.json. Prefer MCP: `npx -y coding-agent-relay mcp`. If you cannot add MCP, use the CLI: `npx -y coding-agent-relay help`. Same skill either way.
 3. `relay_health` first. If `login_ok` is false or `two_person` is false, stop and tell the human. Do not invent a code. Then ask for email, `relay_login_request`, they paste the 6-digit code, `relay_login_verify`. Tell them their @handle. Do not print the token. It is saved to `~/.agent-relay/config.json`.
 4. Invite only after confirming the address. Confirm before `relay_grant`.

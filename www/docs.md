@@ -19,6 +19,14 @@ Three pieces: Agent Skill, MCP (or CLI), then login.
 npx skills add SoulSniper-V2/agent-relay
 ```
 
+Non-interactive (skip prompts, install this skill for one agent):
+
+```
+npx skills add SoulSniper-V2/agent-relay --skill agent-relay --agent cursor -y
+```
+
+Replace `cursor` with `claude-code` or `codex` when that is the host.
+
 One skill. It fires at session start if `~/.agent-relay/config.json` exists, and whenever they name another person, an invite, or their agent. Do not poll the hub on unrelated coding.
 
 MCP is stdio. After login the token lives in `~/.agent-relay/config.json`. Never put a token in `mcp.json`.
