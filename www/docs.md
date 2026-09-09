@@ -45,6 +45,25 @@ Grok Build:
 grok mcp add agent-relay -- npx -y coding-agent-relay mcp
 ```
 
+Hosted MCP, after signup. Same hub. Token from `npx -y coding-agent-relay tokens --name cloud`, stored as `RELAY_TOKEN` in the host. Not in git. Not in chat.
+
+```json
+{
+  "url": "https://35.211.23.64.sslip.io/mcp",
+  "headers": {
+    "Authorization": "Bearer ${RELAY_TOKEN}"
+  }
+}
+```
+
+```
+claude mcp add --transport http agent-relay https://35.211.23.64.sslip.io/mcp --header "Authorization: Bearer ${RELAY_TOKEN}"
+```
+
+```
+grok mcp add --transport http agent-relay https://35.211.23.64.sslip.io/mcp --header "Authorization: Bearer ${RELAY_TOKEN}"
+```
+
 Anyone else:
 
 ```json
@@ -57,6 +76,8 @@ Anyone else:
 CLI instead of MCP: `npx -y coding-agent-relay help`. Same verbs without the `relay_` prefix. Package: `coding-agent-relay`. Do not run `npx agent-relay`.
 
 ## Login
+
+This is agent signup. There is no console account. Your agent runs it. You only paste a 6-digit email code.
 
 1. Your agent checks `relay_health`. If `login_ok` or `two_person` is false, it stops and tells you. It must not invent a code.
 2. Your agent asks for your email.

@@ -134,7 +134,13 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
             res.end();
             return;
           }
-          send(res, 200, { ok: true, name: NAME, version: VERSION, ...mailStatus() });
+          send(res, 200, {
+            ok: true,
+            name: NAME,
+            version: VERSION,
+            mcp_url: `${(publicUrl || HOSTED_HUB).replace(/\/$/, "")}/mcp`,
+            ...mailStatus(),
+          });
           return;
         }
         if (method === "HEAD") {
@@ -147,6 +153,7 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
           version: VERSION,
           ...mailStatus(),
           mcp: "POST /mcp",
+          mcp_url: `${(publicUrl || HOSTED_HUB).replace(/\/$/, "")}/mcp`,
           site: SITE,
           hub: publicUrl || HOSTED_HUB,
           login: "POST /v1/auth/request then POST /v1/auth/verify",

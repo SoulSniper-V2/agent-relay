@@ -12,7 +12,7 @@ SoulSniper hosts the **hub** on a GCE VM. The **site** is static `www/` on Verce
 | Edge | Caddy on :80/:443 | TLS for `35.211.23.64.sslip.io`. Proxies `/health` `/v1` `/mcp`. Other paths redirect to Vercel. |
 | Disk | `/var/lib/agent-relay/hub.db` | SQLite. One instance. |
 | Email | Resend or SMTP via `/etc/agent-relay.env` | `onboarding@resend.dev` cannot mail a second person |
-| Install | npm `coding-agent-relay` | `npx -y coding-agent-relay mcp` or CLI. Skill: `npx skills add SoulSniper-V2/agent-relay` |
+| Install | npm `coding-agent-relay` | stdio MCP or CLI for first login (agent signup). Hosted MCP: `POST /mcp` with Bearer PAT. Skill: `npx skills add SoulSniper-V2/agent-relay` |
 
 Public hub: `https://35.211.23.64.sslip.io` (`RELAY_PUBLIC_URL`). HTTP IP `http://35.211.23.64` is a fallback.
 

@@ -322,9 +322,12 @@ test("HTTP: invite, send, inbox, decide across two tokens", async () => {
     const board = await bobApi.request<{ hub: { login_ok: boolean; email: string }; pending: unknown[] }>("GET", "/v1/sync");
     assert.equal(board.hub.email, "file");
     assert.equal(typeof board.hub.login_ok, "boolean");
-    const home = await new RelayClient(url).request<{ name: string; email: string }>("GET", "/");
+    const home = await new RelayClient(url).request<{ name: string; email: string; mcp_url: string }>("GET", "/");
     assert.equal(home.name, "agent-relay");
     assert.equal(home.email, "file");
+    assert.match(home.mcp_url, /\/mcp$/);
+    const health = await new RelayClient(url).request<{ mcp_url: string }>("GET", "/health");
+    assert.equal(health.mcp_url, home.mcp_url);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())));
     rmSync(dir, { recursive: true, force: true });
@@ -634,6 +637,67 @@ test("public agent paste tells the agent to fetch skill.md", () => {
   assert.match(skill, /How it works/);
   assert.match(readFileSync("www/llms.txt", "utf8"), /Instructions for AI agents/);
   assert.match(readFileSync("www/docs.md", "utf8"), /Grok Build/);
+  assert.match(readFileSync("www/docs.md", "utf8"), /35\.211\.23\.64\.sslip\.io\/mcp/);
+  assert.match(readFileSync("skills/agent-relay/SKILL.md", "utf8"), /This is agent signup/);
+});
+
+test("hosted HTTP MCP works without a token for login tools and with a bearer after signup", async () => {
+  const { dir, db } = tmpDb();
+  process.env.RELAY_DEV_OTP = "1";
+  process.env.RELAY_MAILBOX_DIR = join(dir, "mail");
+  delete process.env.RELAY_RESEND_KEY;
+  delete process.env.RELAY_REQUIRE_EMAIL;
+  const store = new Store(openDb(db));
+  const server = createRelayServer(store);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const addr = server.address();
+  const port = typeof addr === "object" && addr ? addr.port : 0;
+  const url = `http://127.0.0.1:${port}`;
+  async function mcp(token: string | undefined, body: unknown) {
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (token) headers.authorization = `Bearer ${token}`;
+    const res = await fetch(`${url}/mcp`, { method: "POST", headers, body: JSON.stringify(body) });
+    return { status: res.status, json: (await res.json()) as Record<string, unknown> };
+  }
+  try {
+    const listed = await mcp(undefined, { jsonrpc: "2.0", id: 1, method: "tools/list" });
+    assert.equal(listed.status, 200);
+    const names = ((listed.json.result as { tools: { name: string }[] }).tools).map((t) => t.name);
+    assert.equal(names.includes("relay_login_request"), true);
+    assert.equal(names.includes("relay_sync"), true);
+    const api = new RelayClient(url);
+    const signup = await api.request<{ email: string; dev_code: string }>("POST", "/v1/auth/request", {
+      email: "signup@test.dev",
+    });
+    const verified = await mcp(undefined, {
+      jsonrpc: "2.0",
+      id: 2,
+      method: "tools/call",
+      params: { name: "relay_login_verify", arguments: { email: signup.email, code: signup.dev_code } },
+    });
+    const verifiedText = JSON.stringify(verified.json);
+    assert.doesNotMatch(verifiedText, /arl_/);
+    assert.match(verifiedText, /stdio MCP|relay verify/);
+    const authedReq = await api.request<{ email: string; dev_code: string }>("POST", "/v1/auth/request", {
+      email: "bearer@test.dev",
+    });
+    const authed = await api.request<{ token: string }>("POST", "/v1/auth/verify", {
+      email: authedReq.email,
+      code: authedReq.dev_code,
+    });
+    const who = await mcp(authed.token, {
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: { name: "relay_whoami", arguments: {} },
+    });
+    assert.match(JSON.stringify(who.json), /bearer/);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())));
+    rmSync(dir, { recursive: true, force: true });
+    delete process.env.RELAY_DEV_OTP;
+    delete process.env.RELAY_MAILBOX_DIR;
+  }
 });
 
 test("HTTP send is rate limited per user", async () => {

@@ -20,5 +20,5 @@ const server = createRelayServer(store, { publicUrl, bus });
 server.listen(port, bind, () => {
   console.log(`agent-relay ${VERSION} on ${publicUrl} (bind ${bind}:${port})`);
   console.log(`db: ${dbPath}`);
-  console.log("Agents: stdio MCP (`relay mcp`) or CLI. Hub JSON: GET /health");
+  console.log("Agents: stdio MCP (`relay mcp`) or CLI for signup. Hosted MCP: POST /mcp with Bearer PAT.");
 });

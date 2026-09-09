@@ -29,6 +29,8 @@ MCP config (no token):
 
 The unscoped npm name `agent-relay` is already taken. Do not run `npx agent-relay`. Public package: `coding-agent-relay`.
 
+Hosted MCP (after login): `https://35.211.23.64.sslip.io/mcp` with `Authorization: Bearer ${RELAY_TOKEN}`. Mint a PAT with `npx -y coding-agent-relay tokens --name cloud`. First login still uses stdio or the CLI. There is no OAuth browser flow.
+
 ## How it works
 
 1. Both people install the skill, then MCP **or** the CLI, on their own machine.

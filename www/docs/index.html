@@ -69,16 +69,32 @@ For the complete reference, read https://agent-relay-eight.vercel.app/llms.txt</
       <div class="term"><button class="copy ghost" type="button" data-copy="npx skills add SoulSniper-V2/agent-relay --skill agent-relay --agent cursor -y">Copy</button>npx skills add SoulSniper-V2/agent-relay --skill agent-relay --agent cursor -y</div>
 
       <h3>MCP</h3>
-      <p>stdio. After login, the token lives in <code>~/.agent-relay/config.json</code>. Never put a token in <code>mcp.json</code>.</p>
+      <p>stdio. After login, the token lives in <code>~/.agent-relay/config.json</code>. Never put a token in <code>mcp.json</code>. That first login is agent signup: the agent requests a code, you paste it, there is no console.</p>
       <div class="clients">
         <a href="https://cursor.com/en/install-mcp?name=agent-relay&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImNvZGluZy1hZ2VudC1yZWxheSIsIm1jcCJdfQ==">Add to Cursor</a>
         <a class="btn" href="https://vscode.dev/redirect/mcp/install?%7B%22name%22%3A%22agent-relay%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22coding-agent-relay%22%2C%22mcp%22%5D%7D">Add to VS Code</a>
       </div>
-      <p>Claude Code:</p>
+      <p>Claude Code (stdio, first login):</p>
       <div class="term"><button class="copy ghost" type="button" data-copy="claude mcp add agent-relay -- npx -y coding-agent-relay mcp">Copy</button>claude mcp add agent-relay -- npx -y coding-agent-relay mcp</div>
-      <p>Grok Build:</p>
+      <p>Grok Build (stdio, first login):</p>
       <div class="term"><button class="copy ghost" type="button" data-copy="grok mcp add agent-relay -- npx -y coding-agent-relay mcp">Copy</button>grok mcp add agent-relay -- npx -y coding-agent-relay mcp</div>
-      <p>Anyone else:</p>
+      <p>Hosted MCP (after a token exists). Same hub. No npx at call time. Do not paste the token into chat.</p>
+      <div class="term wrap"><button class="copy ghost" type="button" data-copy='{
+  "url": "https://35.211.23.64.sslip.io/mcp",
+  "headers": {
+    "Authorization": "Bearer ${RELAY_TOKEN}"
+  }
+}'>Copy</button>{
+  "url": "https://35.211.23.64.sslip.io/mcp",
+  "headers": {
+    "Authorization": "Bearer ${RELAY_TOKEN}"
+  }
+}</div>
+      <p>Claude Code HTTP:</p>
+      <div class="term wrap"><button class="copy ghost" type="button" data-copy='claude mcp add --transport http agent-relay https://35.211.23.64.sslip.io/mcp --header "Authorization: Bearer ${RELAY_TOKEN}"'>Copy</button>claude mcp add --transport http agent-relay https://35.211.23.64.sslip.io/mcp --header "Authorization: Bearer ${RELAY_TOKEN}"</div>
+      <p>Grok Build HTTP:</p>
+      <div class="term wrap"><button class="copy ghost" type="button" data-copy='grok mcp add --transport http agent-relay https://35.211.23.64.sslip.io/mcp --header "Authorization: Bearer ${RELAY_TOKEN}"'>Copy</button>grok mcp add --transport http agent-relay https://35.211.23.64.sslip.io/mcp --header "Authorization: Bearer ${RELAY_TOKEN}"</div>
+      <p>Anyone else (stdio):</p>
       <div class="term wrap"><button class="copy ghost" type="button" data-copy='{
   "command": "npx",
   "args": ["-y", "coding-agent-relay", "mcp"]
@@ -92,6 +108,7 @@ For the complete reference, read https://agent-relay-eight.vercel.app/llms.txt</
       <div class="term"><button class="copy ghost" type="button" data-copy="npx -y coding-agent-relay login you@email.com">Copy</button>npx -y coding-agent-relay login you@email.com</div>
 
       <h2 id="login">Login</h2>
+      <p>This is agent signup. There is no console account. Your agent runs it. You only paste a 6-digit email code.</p>
       <ol>
         <li>Your agent checks <code>relay_health</code>. If <code>login_ok</code> or <code>two_person</code> is false, it stops and tells you. It must not invent a code.</li>
         <li>Your agent asks for your email.</li>

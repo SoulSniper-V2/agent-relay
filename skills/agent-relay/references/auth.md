@@ -4,7 +4,7 @@ Default hub is `https://35.211.23.64.sslip.io`. Both people must use the same hu
 
 ## Login (this is the product path)
 
-The human owns the mailbox. You run login in chat.
+This is agent signup. There is no console. The human owns the mailbox. You run login in chat.
 
 0. `relay_health` first. If `login_ok` is false or `two_person` is false, stop and tell the human. `two_person: false` means Resend sandbox (`onboarding@resend.dev`) which can only mail the account owner — a second person cannot log in. Do not invent a code.
 1. Ask for their email.
@@ -27,6 +27,8 @@ Do not print the token. Do not put it in `mcp.json`. MCP is `npx -y coding-agent
 
 ## MCP shape
 
-stdio, like GitHub's local MCP. Hosts inject env. HTTP Bearer on `/mcp` exists for the hub. Do not collect a long-lived secret through the model if login already saved one.
+stdio (`npx -y coding-agent-relay mcp`) is agent signup. Login tools work before a token exists. The PAT is saved to `~/.agent-relay/config.json`. Do not put it in `mcp.json`.
+
+Hosted MCP is already on the hub: `https://35.211.23.64.sslip.io/mcp`. Streamable HTTP. `Authorization: Bearer ${RELAY_TOKEN}`. Use this for cloud agents, Claude HTTP, Grok HTTP, or any client that will not run npx. Mint a PAT with `npx -y coding-agent-relay tokens --name cloud` after signup. Do not collect a long-lived secret through the model if login already saved one. Do not open a browser. There is no OAuth.
 
 OTP through chat is the compromise so you can finish login. Use the code once. Do not echo it later.

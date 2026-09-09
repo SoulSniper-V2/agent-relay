@@ -6,6 +6,7 @@
 import { RelayClient } from "./client.ts";
 import { loadConfig, saveConfig } from "./config.ts";
 import { inviteMail, inviteResult, loginCodeMail, mailStatus, sendMail } from "./email.ts";
+import { HOSTED_HUB } from "./hosted.ts";
 import type { Store } from "./store.ts";
 import { NAME, VERSION } from "./version.ts";
 
@@ -28,7 +29,8 @@ export const MCP_TOOLS = [
   },
   {
     name: "relay_login_verify",
-    description: "Finish login with the 6-digit code. Saves the token on this machine. Never paste the token into chat.",
+    description:
+      "Finish login with the 6-digit code. Stdio MCP and the CLI save the token on this machine. HTTP MCP does not return a PAT. Never paste the token into chat.",
     inputSchema: {
       type: "object",
       properties: { email: { type: "string" }, code: { type: "string" } },
@@ -239,12 +241,25 @@ async function callTool(ctx: Ctx, name: string, args: Record<string, unknown>): 
   switch (name) {
     case "relay_health":
       if (store) {
-        return { ok: true, name: NAME, version: VERSION, hub: ctx.hubUrl || "local", ...mailStatus() };
+        const hub = ctx.hubUrl || HOSTED_HUB;
+        return {
+          ok: true,
+          name: NAME,
+          version: VERSION,
+          hub,
+          mcp_url: `${hub.replace(/\/$/, "")}/mcp`,
+          ...mailStatus(),
+        };
       }
       {
         const remote = await api(ctx.hubUrl, ctx.token, false).request<Record<string, unknown>>("GET", "/health");
         const filled = remote.email == null ? { ...remote, ...mailStatus("off") } : remote;
-        return { ...filled, hub: ctx.hubUrl };
+        const hub = ctx.hubUrl || HOSTED_HUB;
+        return {
+          ...filled,
+          hub,
+          mcp_url: typeof filled.mcp_url === "string" ? filled.mcp_url : `${hub.replace(/\/$/, "")}/mcp`,
+        };
       }
 
     case "relay_login_request":

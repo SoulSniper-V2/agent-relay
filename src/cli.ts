@@ -50,10 +50,10 @@ async function main() {
 Login (hosted hub by default)
   relay login <email>            Email a 6-digit code to the human
   relay verify <email> <code>    Finish login; saves RELAY_TOKEN
-  relay health                   Hub status (login_ok, two_person, email: resend | smtp | file | off)
+  relay health                   Hub status (login_ok, two_person, mcp_url)
   relay whoami                   You + people + pending + human inbox
   relay sync                     Session board (handle agent mail yourself)
-  relay tokens [--name] [--agent slug]   Mint a PAT for MCP / another runtime
+  relay tokens [--name] [--agent slug]   Mint a PAT for hosted MCP / another runtime
 
 People
   relay invite [--email addr]
