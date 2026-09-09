@@ -1,8 +1,3 @@
-const PHASES = [
-  { id: "agent", escalate: false, ms: 6400 },
-  { id: "human", escalate: true, ms: 2800 },
-];
-
 function textToCopy(el) {
   const from = el.getAttribute("data-copy-from");
   if (from) {
@@ -13,13 +8,13 @@ function textToCopy(el) {
 }
 
 function flash(el, ok) {
-  const original = el.getAttribute("data-label") || el.textContent;
+  const original = el.getAttribute("data-label") || el.innerHTML;
   el.setAttribute("data-label", original);
   el.textContent = ok ? "Copied" : "Copy failed";
   el.classList.toggle("is-copied", ok);
   window.clearTimeout(el._copyTimer);
   el._copyTimer = window.setTimeout(() => {
-    el.textContent = el.getAttribute("data-label") || "Copy";
+    el.innerHTML = el.getAttribute("data-label") || "Copy";
     el.classList.remove("is-copied");
   }, 1400);
 }
@@ -34,21 +29,6 @@ document.querySelectorAll("[data-copy], [data-copy-from]").forEach((el) => {
     }
   });
 });
-
-function runBoard(root) {
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  let i = 0;
-  const tick = () => {
-    const phase = PHASES[i % PHASES.length];
-    root.dataset.phase = phase.id;
-    root.classList.toggle("is-escalating", phase.escalate);
-    i += 1;
-    window.setTimeout(tick, phase.ms);
-  };
-  tick();
-}
-
-document.querySelectorAll(".switchboard").forEach(runBoard);
 
 const nav = [...document.querySelectorAll(".side a[href^='#']")];
 const sections = nav
