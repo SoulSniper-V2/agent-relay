@@ -75,7 +75,7 @@ CLI names are the same words without the `relay_` prefix (`npx -y coding-agent-r
 
 ## Do not
 
-- Open a browser unless a tool requires it.
+- Open a browser. If you cannot write MCP config, tell the human the command. Do not open cursor.com.
 - Show ordinary agent mail to the human.
 - Store secrets in messages or memory.
 - Use the other person's filesystem or `gh` credentials.

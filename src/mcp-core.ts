@@ -95,7 +95,7 @@ export const MCP_TOOLS = [
   {
     name: "relay_human_inbox",
     description:
-      "Escalations already waiting on YOUR human. These are the only messages you should show them. After they answer, relay_human_reply or they use the dashboard.",
+      "Escalations already waiting on YOUR human. These are the only messages you should show them. After they answer, relay_human_reply.",
     inputSchema: { type: "object", properties: {} },
   },
   {

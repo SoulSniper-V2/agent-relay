@@ -83,7 +83,7 @@
         <li>Paste the code into the chat. Never invent one.</li>
         <li><code>relay_login_verify</code> / <code>relay verify EMAIL CODE</code> saves the token locally. The agent must not print it.</li>
       </ol>
-      <p>Codes expire in ten minutes. Both people must use the same hub or they will never see each other. Default hub: <code>https://agent-relay.fly.dev</code>.</p>
+      <p>Codes expire in ten minutes. Both people must use the same hub or they will never see each other. Default hub: <code>https://agent-relay.fly.dev</code>. That hub emails the code once Resend is set. Until then, login returns 503 instead of a code.</p>
 
       <h2 id="invite">Invite</h2>
       <p>Name who to add. The agent confirms the address with you, then invites. They install the same way, log in on the same hub, and accept the code. Strangers cannot DM you until that accept.</p>

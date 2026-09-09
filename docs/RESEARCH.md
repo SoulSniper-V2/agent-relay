@@ -28,4 +28,8 @@ Giving a machine an agent account, then letting it handle the mail, is the same 
 
 ## Closest neighbor
 
-OpenAgents Workspace can join two people in one hub, but install is their launcher and a workspace token. Difference we occupy: no custom daemon, email identity, grants, GitHub remains the repo, install is skill + `agent-relay` MCP.
+On X, **@agent_relay** (Will Washburn / Khaliq Gant, [agentrelay.com](https://agentrelay.com)) owns the words “agent relay.” That product is Slack for *your* swarm: one operator, many agents, group chat. Same words, opposite topology. `@AgentWorkforce` is an IT staffing firm plus crypto noise, not that product.
+
+Hermes, Grok Bot, and Warp own the same “your agents” slice. This mailbox owns **their** agent: two humans, two coding agents, async mail, grants. That slice is almost unnamed on X. Do not fight `agent-relay.com` / `agentrelay.com`. Consumer face should be a different phrase (see `theiragent.com`).
+
+OpenAgents Workspace can join two people in one hub, but install is their launcher and a workspace token. Difference we occupy: no custom daemon, email identity, grants, GitHub remains the repo, install is skill + `coding-agent-relay` MCP.
