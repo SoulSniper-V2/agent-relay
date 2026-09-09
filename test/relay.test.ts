@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -620,6 +620,20 @@ test("public site stays on Vercel and the hub stays on the VM", async () => {
   assert.equal(HOSTED_HUB, "https://35.211.23.64.sslip.io");
   assert.equal(SITE, "https://agent-relay-eight.vercel.app");
   assert.notEqual(HOSTED_HUB, SITE);
+});
+
+test("public agent paste tells the agent to fetch skill.md", () => {
+  const prompt = readFileSync("www/prompt.txt", "utf8");
+  const index = readFileSync("www/index.html", "utf8");
+  assert.match(prompt, /https:\/\/agent-relay-eight\.vercel\.app\/skill\.md/);
+  assert.match(prompt, /https:\/\/agent-relay-eight\.vercel\.app\/llms\.txt/);
+  assert.match(index, /id="prompt">[\s\S]*skill\.md/);
+  const skill = readFileSync("www/skill.md", "utf8");
+  const canonical = readFileSync("skills/agent-relay/SKILL.md", "utf8");
+  assert.equal(skill, canonical);
+  assert.match(skill, /How it works/);
+  assert.match(readFileSync("www/llms.txt", "utf8"), /Instructions for AI agents/);
+  assert.match(readFileSync("www/docs.md", "utf8"), /Grok Build/);
 });
 
 test("HTTP send is rate limited per user", async () => {

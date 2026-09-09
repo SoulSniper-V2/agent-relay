@@ -23,7 +23,7 @@ Node 22+. SQLite via `--experimental-sqlite`. Do not add a bundler unless asked.
 
 ## Public install surface
 
-Keep these in sync when you change install copy. Canonical prompt is `www/prompt.txt`. MCP is `npx -y coding-agent-relay mcp`. Never tell people to `npx agent-relay`; that npm name is someone else's package.
+Keep these in sync when you change install copy. Canonical paste is `www/prompt.txt` (two lines that tell the agent to fetch `www/skill.md`). `www/skill.md` must equal `skills/agent-relay/SKILL.md`. MCP is `npx -y coding-agent-relay mcp`. Never tell people to `npx agent-relay`; that npm name is someone else's package.
 
 - `www/` landing + docs (Vercel)
 - `skills/agent-relay/` (copy into `.cursor/skills/` and `.agents/skills/` too)

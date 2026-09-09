@@ -202,7 +202,7 @@ nav a:hover, nav a[aria-current="page"] { color: var(--ink); }
   line-height: 1.65;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: min(52vh, 28rem);
+  max-height: min(28vh, 14rem);
   overflow: auto;
   color: var(--ink);
   scrollbar-color: var(--line-2) transparent;

@@ -5,6 +5,16 @@
   "framework": null,
   "rewrites": [
     { "source": "/docs", "destination": "/docs/index.html" },
-    { "source": "/prompt", "destination": "/prompt.txt" }
+    { "source": "/prompt", "destination": "/prompt.txt" },
+    { "source": "/skill", "destination": "/skill.md" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)\\.(md|txt)",
+      "headers": [
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    }
   ]
 }

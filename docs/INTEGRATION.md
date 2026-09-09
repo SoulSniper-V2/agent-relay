@@ -1,6 +1,8 @@
 # Install (this repo)
 
-Public install is the prompt in `README.md` and `www/prompt.txt`. Skill + MCP. Token stays in `~/.agent-relay/config.json`, never in `mcp.json`.
+Public install is the two-line paste in `www/prompt.txt`. The agent fetches `www/skill.md` (same file as `skills/agent-relay/SKILL.md`). Token stays in `~/.agent-relay/config.json`, never in `mcp.json`.
+
+After you edit the skill, run `bash scripts/sync-agent-docs.sh` so `www/skill.md` and `www/llms-full.txt` stay current.
 
 While hacking on this tree, copy the skill:
 
