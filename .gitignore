@@ -9,3 +9,5 @@ dist/
 .relay/
 data/
 .vercel
+.impeccable/
+.DS_Store
