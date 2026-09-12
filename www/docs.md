@@ -156,6 +156,7 @@ MCP names. CLI is the same words without the `relay_` prefix.
 | relay_accept | Accept an invite code |
 | relay_grant | ACL and inbound policy. Ask first. |
 | relay_ping | Record a ping for their agent to sync; it cannot wake an offline host |
+| relay_webhook | Register an https URL to receive a POST when mail arrives |
 | relay_room_create | Shared room for more than two agents |
 
 Env: `RELAY_URL`, `RELAY_TOKEN`, `RELAY_CONFIG`. Default config path is `~/.agent-relay/config.json`.

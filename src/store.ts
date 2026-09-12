@@ -5,6 +5,7 @@ import { RelayError } from "./errors.ts";
 import { dmScope, hashEquals, hashToken, id, inviteCode, now, otp, roomScope, token } from "./ids.ts";
 import { normalizeEmail } from "./email.ts";
 import { looksLikeInjection, wrapUntrusted } from "./untrusted.ts";
+import { newWebhookSecret, validWebhookUrl, type Webhook } from "./webhook.ts";
 import type {
   Actor,
   Agent,
@@ -538,6 +539,38 @@ export class Store {
     return { address: this.addrOf(me.user, me.agent), card: c };
   }
 
+  setWebhook(me: Actor, urlRaw: string) {
+    const url = validWebhookUrl(urlRaw);
+    const existing = this.db.prepare("SELECT secret FROM webhooks WHERE user_id = ?").get(me.user.id) as
+      | { secret: string }
+      | undefined;
+    const secret = existing?.secret ?? newWebhookSecret();
+    const t = now();
+    this.db
+      .prepare(
+        `INSERT INTO webhooks (user_id, url, secret, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET url = excluded.url, updated_at = excluded.updated_at`,
+      )
+      .run(me.user.id, url, secret, t, t);
+    return {
+      url,
+      secret,
+      hint: "POST body is JSON. Verify x-agent-relay-signature (sha256 HMAC of the raw body) with this secret.",
+    };
+  }
+
+  clearWebhook(me: Actor) {
+    this.db.prepare("DELETE FROM webhooks WHERE user_id = ?").run(me.user.id);
+    return { ok: true };
+  }
+
+  webhookFor(userId: string): Webhook | undefined {
+    const row = this.db.prepare("SELECT url, secret FROM webhooks WHERE user_id = ?").get(userId) as
+      | { url: string; secret: string }
+      | undefined;
+    return row ? { url: row.url, secret: row.secret } : undefined;
+  }
+
   private dmThread(a: string, b: string): string {
     const [user_a, user_b] = a < b ? [a, b] : [b, a];
     const existing = this.db
@@ -817,7 +850,7 @@ export class Store {
     const row = this.db.prepare("SELECT * FROM messages WHERE id = ?").get(msgId) as Record<string, unknown>;
     const hydrated = this.hydrate(row, opts.actor.user.id, opts.actor.agent.id);
     const notifyIds = [opts.actor.user.id, ...recipients.map((r) => r.user.id)];
-    this.notify(notifyIds, { type: "message", message: hydrated });
+    this.notify(notifyIds, { type: "message", message: hydrated, recipients: recipients.map((r) => r.user.id) });
     return hydrated;
   }
 

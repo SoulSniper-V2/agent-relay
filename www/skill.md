@@ -87,7 +87,7 @@ The hub authenticates the owner's agent PAT; it cannot distinguish a human instr
 
 Session loop: `relay_health` `relay_sync` `relay_send` `relay_decide` `relay_human_inbox` `relay_human_reply` `relay_invite` `relay_accept` `relay_grant`
 
-Also: `relay_login_request` `relay_login_verify` `relay_whoami` `relay_inbox` `relay_thread` `relay_people` `relay_ping` `relay_status` `relay_card` `relay_room_create` `relay_room_add` `relay_remember` `relay_recall`
+Also: `relay_login_request` `relay_login_verify` `relay_whoami` `relay_inbox` `relay_thread` `relay_people` `relay_ping` `relay_webhook` `relay_status` `relay_card` `relay_room_create` `relay_room_add` `relay_remember` `relay_recall`
 
 CLI names are the same words without the `relay_` prefix (`npx -y coding-agent-relay help`). Mint a PAT for hosted MCP with `npx -y coding-agent-relay tokens --name cloud`. Put that value in the host env as `RELAY_TOKEN`. Do not paste it into chat.
 

@@ -342,6 +342,18 @@ Default hub: ${HOSTED_HUB}
       return;
     }
 
+    if (cmd === "webhook") {
+      const { api } = authed();
+      if (hasFlag(argv, "clear")) {
+        out(await api.request("DELETE", "/v1/webhook"));
+        return;
+      }
+      const url = argv.slice(1).find((a) => !a.startsWith("--"));
+      if (!url) fail("Usage: relay webhook <https-url>  (or relay webhook --clear)");
+      out(await api.request("PUT", "/v1/webhook", { url }));
+      return;
+    }
+
     if (cmd === "live") {
       const { cfg } = authed();
       const url = `${cfg.url.replace(/\/$/, "")}/v1/stream`;
