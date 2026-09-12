@@ -23,6 +23,7 @@ const ONLINE_MS = 120_000;
 const OTP_TTL_MS = 10 * 60 * 1000;
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_BODY = 20_000;
+const MAX_PAYLOAD = 64_000;
 
 function rowUser(r: Record<string, unknown>): User {
   return {
@@ -661,6 +662,15 @@ export class Store {
     const text = spec.body.trim();
     if (!text) throw new RelayError(400, "Message body is empty.");
     if (text.length > MAX_BODY) throw new RelayError(400, "Message too long (max 20k).");
+    if (spec.payload !== undefined) {
+      const payload: unknown = spec.payload;
+      if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
+        throw new RelayError(400, "payload must be a JSON object.");
+      }
+      if (JSON.stringify(payload).length > MAX_PAYLOAD) {
+        throw new RelayError(400, "Message payload too large (max 64k).");
+      }
+    }
     const intent = (spec.intent?.trim() || "chat") as Intent;
     if (!INTENTS.has(intent)) throw new RelayError(400, `Unknown intent. Use ${[...INTENTS].join(", ")}.`);
     if (spec.from_role === "human" && spec.allow_human !== true) {
