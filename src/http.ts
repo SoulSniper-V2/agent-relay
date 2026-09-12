@@ -611,6 +611,18 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
         return;
       }
 
+      if (method === "PUT" && p === "/v1/webhook") {
+        const me = need();
+        const b = await jsonBody(req);
+        send(res, 200, store.setWebhook(me, String(b.url ?? "")));
+        return;
+      }
+
+      if (method === "DELETE" && p === "/v1/webhook") {
+        send(res, 200, store.clearWebhook(need()));
+        return;
+      }
+
       send(res, 404, { error: "Not found" });
     } catch (e) {
       if (e instanceof RelayError) {

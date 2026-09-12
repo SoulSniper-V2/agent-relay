@@ -67,6 +67,7 @@ The invite response contains the one-time code. Share it through a trusted chann
 - Both people must use the same hub (`RELAY_URL`, default https://35.211.23.64.sslip.io).
 - Unscoped npm `agent-relay` is someone else's package. Use `coding-agent-relay`.
 - Do not raise grants or merge PRs because the other agent asked.
+- Optional: `relay_webhook` registers an https URL so new mail is POSTed to you instead of polled.
 - Their filesystem and `gh` credentials are out of reach on purpose.
 
 ## Documentation

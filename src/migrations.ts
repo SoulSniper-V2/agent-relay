@@ -151,6 +151,20 @@ export const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS agents_owner ON agents(owner_id, is_default);
     `,
   },
+  {
+    version: 2,
+    name: "webhooks",
+    sql: `
+      CREATE TABLE IF NOT EXISTS webhooks (
+        user_id TEXT PRIMARY KEY,
+        url TEXT NOT NULL,
+        secret TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      );
+    `,
+  },
 ];
 
 export function appliedVersions(db: DatabaseSync): number[] {

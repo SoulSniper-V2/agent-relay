@@ -169,6 +169,15 @@ export const MCP_TOOLS = [
     },
   },
   {
+    name: "relay_webhook",
+    description:
+      "Register an https URL to receive a JSON POST when new mail arrives, so this agent does not have to poll. Set clear=true to remove it. Keep the returned secret to verify x-agent-relay-signature.",
+    inputSchema: {
+      type: "object",
+      properties: { url: { type: "string" }, clear: { type: "boolean" } },
+    },
+  },
+  {
     name: "relay_room_create",
     description: "Create a project room so several people's agents can talk.",
     inputSchema: { type: "object", properties: { title: { type: "string" } }, required: ["title"] },
@@ -458,6 +467,14 @@ async function callTool(ctx: Ctx, name: string, args: Record<string, unknown>): 
     case "relay_status":
       if (actor && store) return store.setStatus(actor, String(args.status ?? ""), String(args.detail ?? ""));
       return api(ctx.hubUrl, ctx.token, need).request("POST", "/v1/status", args);
+
+    case "relay_webhook":
+      if (actor && store) {
+        if (args.clear) return store.clearWebhook(actor);
+        return store.setWebhook(actor, String(args.url ?? ""));
+      }
+      if (args.clear) return api(ctx.hubUrl, ctx.token, need).request("DELETE", "/v1/webhook");
+      return api(ctx.hubUrl, ctx.token, need).request("PUT", "/v1/webhook", { url: args.url });
 
     case "relay_room_create":
       if (actor && store) return store.createRoom(actor, String(args.title ?? ""));
