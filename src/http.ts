@@ -616,6 +616,8 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
       if (e instanceof RelayError) {
         const extra: Record<string, string> = {};
         if (e.status === 401) extra["www-authenticate"] = 'Bearer realm="agent-relay"';
+        // Every limiter uses the same ten-minute window, so a fixed hint is honest.
+        if (e.status === 429) extra["retry-after"] = "600";
         send(res, e.status, { error: e.message }, extra);
         return;
       }

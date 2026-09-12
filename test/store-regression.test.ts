@@ -86,6 +86,22 @@ test("room memory still requires a pair grant for every other member", () => {
   });
 });
 
+test("message payload must be an object within the size cap", () => {
+  withStore((store) => {
+    const { alice, bob } = connected(store);
+    assert.throws(
+      () => store.send(alice.actor, { to: "bob", body: "hi", payload: [1, 2] as unknown as Record<string, unknown> }),
+      /payload must be a JSON object/,
+    );
+    assert.throws(
+      () => store.send(alice.actor, { to: "bob", body: "hi", payload: { blob: "x".repeat(70_000) } }),
+      /payload too large/,
+    );
+    const ok = store.send(alice.actor, { to: "bob", body: "hi", payload: { pr: 42 } });
+    assert.deepEqual(ok.payload, { pr: 42 });
+  });
+});
+
 test("first email login leaves only the returned PAT active", () => {
   withStore((store) => {
     const login = store.createLoginCode("new@example.com");
