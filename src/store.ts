@@ -50,13 +50,55 @@ function rowAgent(r: Record<string, unknown>): Agent {
 }
 
 export class Store {
+  private notificationQueue: { userIds: string[]; ev: { type: string; [key: string]: unknown } }[] | null = null;
+
   constructor(
     private db: DatabaseSync,
     private emit?: (userIds: string[], ev: RelayEvent) => void,
   ) {}
 
+  private emitNow(userIds: string[], ev: { type: string; [key: string]: unknown }) {
+    this.emit?.(userIds, { ...ev, at: now() });
+  }
+
   private notify(userIds: string[], ev: Omit<RelayEvent, "at">) {
-    this.emit?.(userIds, { type: ev.type, ...ev, at: now() });
+    const normalized = { ...ev, type: String(ev.type) };
+    if (this.notificationQueue) {
+      this.notificationQueue.push({ userIds, ev: normalized });
+      return;
+    }
+    this.emitNow(userIds, normalized);
+  }
+
+  private transaction<T>(fn: () => T): T {
+    let began = false;
+    let result!: T;
+    const previousQueue = this.notificationQueue;
+    const queue = previousQueue ?? [];
+    this.notificationQueue = queue;
+    try {
+      this.db.exec("BEGIN IMMEDIATE");
+      began = true;
+      result = fn();
+      this.db.exec("COMMIT");
+      began = false;
+    } catch (e) {
+      if (began) {
+        try {
+          this.db.exec("ROLLBACK");
+        } catch {
+          /* preserve the operation's original error */
+        }
+      }
+      this.notificationQueue = previousQueue;
+      if (!previousQueue) queue.length = 0;
+      throw e;
+    }
+    this.notificationQueue = previousQueue;
+    if (!previousQueue) {
+      for (const notification of queue) this.emitNow(notification.userIds, notification.ev);
+    }
+    return result;
   }
 
   private getUser(id: string): User | undefined {
@@ -246,6 +288,11 @@ export class Store {
     if (!existing) {
       is_new = true;
       const created = this.register(this.uniqueHandle(email.split("@")[0] ?? "user"));
+      // register() issues a bootstrap PAT for open registration. Email login
+      // issues its own token below, so discard the undisclosed bootstrap PAT.
+      this.db
+        .prepare("DELETE FROM agent_tokens WHERE id = ? AND user_id = ?")
+        .run(created.actor.token_id, created.user.id);
       this.db.prepare("UPDATE users SET email = ? WHERE id = ?").run(email, created.user.id);
       existing = this.db.prepare("SELECT * FROM users WHERE id = ?").get(created.user.id) as Record<string, unknown>;
     }
@@ -573,7 +620,7 @@ export class Store {
         `SELECT u.handle FROM room_members m JOIN users u ON u.id = m.user_id
          WHERE m.room_id = ? ORDER BY u.handle`,
       )
-      .all(r.id) as { handle: string }[];
+      .all(String(r.id)) as { handle: string }[];
     return {
       id: String(r.id),
       slug: String(r.slug),
@@ -817,105 +864,110 @@ export class Store {
     messageId: string,
     spec: { action: DecideAction; reason?: string; reply?: string; from_role?: FromRole },
   ) {
-    const d = this.db
-      .prepare("SELECT * FROM deliveries WHERE message_id = ? AND agent_id = ?")
-      .get(messageId, me.agent.id) as Record<string, unknown> | undefined;
-    if (!d) {
-      const any = this.db.prepare("SELECT * FROM deliveries WHERE message_id = ? AND user_id = ?").get(
-        messageId,
-        me.user.id,
-      ) as Record<string, unknown> | undefined;
-      if (!any) throw new RelayError(404, "Message not found in your inbox.");
-      throw new RelayError(403, "This delivery belongs to a different agent of yours.");
-    }
-    const action = spec.action;
-    if (!["handle", "escalate", "dismiss", "reply"].includes(action)) {
-      throw new RelayError(400, "action: handle | escalate | dismiss | reply");
-    }
-    const ts = now();
-    if (action === "escalate") {
-      const original = this.db.prepare("SELECT from_user FROM messages WHERE id = ?").get(messageId) as
-        | { from_user: string }
-        | undefined;
-      const fromUser = original ? this.getUser(original.from_user) : undefined;
-      if (fromUser) {
-        const { inbound_policy } = this.grantsBetween(me.user.id, fromUser.id);
-        if (inbound_policy === "silent") {
-          throw new RelayError(
-            403,
-            `Inbound policy for @${fromUser.handle} is silent. Handle or dismiss; do not escalate.`,
-          );
-        }
+    return this.transaction(() => {
+      const d = this.db
+        .prepare("SELECT * FROM deliveries WHERE message_id = ? AND agent_id = ?")
+        .get(messageId, me.agent.id) as Record<string, unknown> | undefined;
+      if (!d) {
+        const any = this.db.prepare("SELECT * FROM deliveries WHERE message_id = ? AND user_id = ?").get(
+          messageId,
+          me.user.id,
+        ) as Record<string, unknown> | undefined;
+        if (!any) throw new RelayError(404, "Message not found in your inbox.");
+        throw new RelayError(403, "This delivery belongs to a different agent of yours.");
       }
-      const reason = (spec.reason ?? "").trim() || "agent asked the human to look";
-      this.db
-        .prepare(
-          "UPDATE deliveries SET triage = 'escalated', visibility = 'human', escalate_reason = ?, decided_at = ? WHERE message_id = ? AND agent_id = ?",
-        )
-        .run(reason, ts, messageId, me.agent.id);
-      this.notify([me.user.id], { type: "escalation", message_id: messageId, reason });
-    } else if (action === "dismiss") {
-      this.db
-        .prepare(
-          "UPDATE deliveries SET triage = 'dismissed', visibility = 'agent', decided_at = ? WHERE message_id = ? AND agent_id = ?",
-        )
-        .run(ts, messageId, me.agent.id);
-    } else {
-      this.db
-        .prepare(
-          "UPDATE deliveries SET triage = 'handled', visibility = 'agent', decided_at = ? WHERE message_id = ? AND agent_id = ?",
-        )
-        .run(ts, messageId, me.agent.id);
-    }
+      const action = spec.action;
+      if (!["handle", "escalate", "dismiss", "reply"].includes(action)) {
+        throw new RelayError(400, "action: handle | escalate | dismiss | reply");
+      }
+      if (String(d.triage) !== "pending") throw new RelayError(409, "Message has already been triaged.");
+      const ts = now();
+      let reply: PublicMessage | undefined;
+      if (action === "reply") {
+        const body = (spec.reply ?? "").trim();
+        if (!body) throw new RelayError(400, "reply action needs a `reply` body.");
+        const original = this.db.prepare("SELECT * FROM messages WHERE id = ?").get(messageId) as
+          | Record<string, unknown>
+          | undefined;
+        if (!original) throw new RelayError(404, "Message not found.");
+        const fromUser = this.getUser(String(original.from_user));
+        if (!fromUser) throw new RelayError(404, "Original sender is gone.");
+        const fromAgent = original.from_agent
+          ? this.getAgent(String(original.from_agent))
+          : this.defaultAgent(fromUser.id);
+        const target = original.room_id
+          ? { room: this.roomSlug(String(original.room_id)) }
+          : { to: formatAgentAddr(fromUser.handle, fromAgent?.slug ?? "main") };
+        reply = this.send(me, {
+          ...target,
+          body,
+          reply_to: messageId,
+          from_role: "agent",
+        });
+      }
+      if (action === "escalate") {
+        const original = this.db.prepare("SELECT from_user FROM messages WHERE id = ?").get(messageId) as
+          | { from_user: string }
+          | undefined;
+        const fromUser = original ? this.getUser(original.from_user) : undefined;
+        if (fromUser) {
+          const { inbound_policy } = this.grantsBetween(me.user.id, fromUser.id);
+          if (inbound_policy === "silent") {
+            throw new RelayError(
+              403,
+              `Inbound policy for @${fromUser.handle} is silent. Handle or dismiss; do not escalate.`,
+            );
+          }
+        }
+        const reason = (spec.reason ?? "").trim() || "agent asked the human to look";
+        this.db
+          .prepare(
+            "UPDATE deliveries SET triage = 'escalated', visibility = 'human', escalate_reason = ?, decided_at = ? WHERE message_id = ? AND agent_id = ? AND triage = 'pending'",
+          )
+          .run(reason, ts, messageId, me.agent.id);
+        this.notify([me.user.id], { type: "escalation", message_id: messageId, reason });
+      } else if (action === "dismiss") {
+        this.db
+          .prepare(
+            "UPDATE deliveries SET triage = 'dismissed', visibility = 'agent', decided_at = ? WHERE message_id = ? AND agent_id = ? AND triage = 'pending'",
+          )
+          .run(ts, messageId, me.agent.id);
+      } else {
+        this.db
+          .prepare(
+            "UPDATE deliveries SET triage = 'handled', visibility = 'agent', decided_at = ? WHERE message_id = ? AND agent_id = ? AND triage = 'pending'",
+          )
+          .run(ts, messageId, me.agent.id);
+      }
 
-    let reply: PublicMessage | undefined;
-    if (action === "reply") {
-      const body = (spec.reply ?? "").trim();
-      if (!body) throw new RelayError(400, "reply action needs a `reply` body.");
-      const original = this.db.prepare("SELECT * FROM messages WHERE id = ?").get(messageId) as
-        | Record<string, unknown>
-        | undefined;
-      if (!original) throw new RelayError(404, "Message not found.");
-      const fromUser = this.getUser(String(original.from_user));
-      if (!fromUser) throw new RelayError(404, "Original sender is gone.");
-      const fromAgent = original.from_agent ? this.getAgent(String(original.from_agent)) : this.defaultAgent(fromUser.id);
-      const target = original.room_id
-        ? { room: this.roomSlug(String(original.room_id)) }
-        : { to: formatAgentAddr(fromUser.handle, fromAgent?.slug ?? "main") };
-      reply = this.send(me, {
-        ...target,
-        body,
-        reply_to: messageId,
-        from_role: "agent",
-      });
-    }
-
-    const row = this.db
-      .prepare(
-        `SELECT m.*, d.triage, d.visibility, d.escalate_reason
-         FROM messages m JOIN deliveries d ON d.message_id = m.id AND d.agent_id = ?
-         WHERE m.id = ?`,
-      )
-      .get(me.agent.id, messageId) as Record<string, unknown>;
-    return { message: this.hydrate(row, me.user.id, me.agent.id), reply };
+      const row = this.db
+        .prepare(
+          `SELECT m.*, d.triage, d.visibility, d.escalate_reason
+           FROM messages m JOIN deliveries d ON d.message_id = m.id AND d.agent_id = ?
+           WHERE m.id = ?`,
+        )
+        .get(me.agent.id, messageId) as Record<string, unknown>;
+      return { message: this.hydrate(row, me.user.id, me.agent.id), reply };
+    });
   }
 
   /** Close an escalation after the human answers through their agent. */
   resolveHuman(me: Actor, messageId: string, spec: { reply?: string }) {
-    const d = this.db
-      .prepare("SELECT * FROM deliveries WHERE message_id = ? AND user_id = ? AND visibility = 'human'")
-      .get(messageId, me.user.id) as Record<string, unknown> | undefined;
-    if (!d) throw new RelayError(404, "No open escalation for that message.");
-    this.db
-      .prepare(
-        "UPDATE deliveries SET triage = 'handled', decided_at = ? WHERE message_id = ? AND user_id = ? AND visibility = 'human'",
-      )
-      .run(now(), messageId, me.user.id);
-    let reply: PublicMessage | undefined;
-    if (spec.reply?.trim()) {
-      const original = this.db.prepare("SELECT * FROM messages WHERE id = ?").get(messageId) as Record<string, unknown>;
-      const fromUser = this.getUser(String(original.from_user));
-      if (fromUser) {
+    return this.transaction(() => {
+      const d = this.db
+        .prepare(
+          "SELECT * FROM deliveries WHERE message_id = ? AND user_id = ? AND visibility = 'human' AND triage = 'escalated'",
+        )
+        .get(messageId, me.user.id) as Record<string, unknown> | undefined;
+      if (!d) throw new RelayError(404, "No open escalation for that message.");
+      let reply: PublicMessage | undefined;
+      if (spec.reply?.trim()) {
+        const original = this.db.prepare("SELECT * FROM messages WHERE id = ?").get(messageId) as
+          | Record<string, unknown>
+          | undefined;
+        if (!original) throw new RelayError(404, "Message not found.");
+        const fromUser = this.getUser(String(original.from_user));
+        if (!fromUser) throw new RelayError(404, "Original sender is gone.");
         const fromAgent = original.from_agent
           ? this.getAgent(String(original.from_agent))
           : this.defaultAgent(fromUser.id);
@@ -928,8 +980,14 @@ export class Store {
           allow_human: true,
         });
       }
-    }
-    return { ok: true, reply };
+      const updated = this.db
+        .prepare(
+          "UPDATE deliveries SET triage = 'handled', decided_at = ? WHERE message_id = ? AND user_id = ? AND visibility = 'human' AND triage = 'escalated'",
+        )
+        .run(now(), messageId, me.user.id);
+      if (Number(updated.changes) !== 1) throw new RelayError(409, "Escalation was already resolved.");
+      return { ok: true, reply };
+    });
   }
 
   thread(me: Actor, threadId: string, limit = 80): PublicMessage[] {
@@ -942,7 +1000,7 @@ export class Store {
     } else {
       const mem = this.db
         .prepare("SELECT 1 FROM room_members WHERE room_id = ? AND user_id = ?")
-        .get(thr.room_id, me.user.id);
+        .get(String(thr.room_id), me.user.id);
       if (!mem) throw new RelayError(403, "Not your thread.");
     }
     const rows = this.db
@@ -967,13 +1025,13 @@ export class Store {
           : `@${fromUser?.handle ?? "unknown"}`;
     const delivery = this.db
       .prepare("SELECT triage, visibility, escalate_reason FROM deliveries WHERE message_id = ? AND agent_id = ?")
-      .get(r.id, viewerAgentId) as { triage: string; visibility: string; escalate_reason: string } | undefined;
+      .get(String(r.id), viewerAgentId) as { triage: string; visibility: string; escalate_reason: string } | undefined;
     const room = r.room_id ? this.roomSlug(String(r.room_id)) : null;
     let to: string | null = room ? `#${room}` : null;
     if (!to) {
       const otherDelivery = this.db
         .prepare("SELECT user_id, agent_id FROM deliveries WHERE message_id = ? LIMIT 1")
-        .get(r.id) as { user_id: string; agent_id: string } | undefined;
+        .get(String(r.id)) as { user_id: string; agent_id: string } | undefined;
       if (otherDelivery) {
         const tu = this.getUser(otherDelivery.user_id);
         const ta = this.getAgent(otherDelivery.agent_id);
@@ -1079,7 +1137,17 @@ export class Store {
 
   private requireMemoryAccess(me: Actor, target: string) {
     const addr = parseTarget(target);
-    if (addr.kind === "room") return;
+    if (addr.kind === "room") {
+      const room = this.requireRoomMember(me, addr.slug);
+      const members = this.db
+        .prepare("SELECT user_id FROM room_members WHERE room_id = ? AND user_id <> ?")
+        .all(room.id, me.user.id) as { user_id: string }[];
+      for (const member of members) {
+        const other = this.getUser(member.user_id);
+        if (other) this.requireAllowed(me.user, other, "memory");
+      }
+      return;
+    }
     const other = this.getUserByHandle(addr.handle);
     if (!other) throw new RelayError(404, `No person or room named ${addr.handle}.`);
     this.requireAllowed(me.user, other, "memory");

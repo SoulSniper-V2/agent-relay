@@ -1,12 +1,14 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { RelayError } from "./errors.ts";
-import { readSmtp, sendSmtp } from "./smtp.ts";
+import { readSmtp, sendSmtp, validateMailAddress } from "./smtp.ts";
+
+const RESEND_TIMEOUT_MS = 10_000;
 
 export function normalizeEmail(email: string): string {
   const e = email.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) || e.length > 254) {
+  if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(e) || e.length > 254) {
     throw new Error("That does not look like an email address.");
   }
   return e;
@@ -41,11 +43,28 @@ function fromEnv(): string {
 export function mailTransport(): MailTransport {
   const key = process.env.RELAY_RESEND_KEY;
   const from = fromEnv();
+  const smtpConfigured = [
+    "RELAY_SMTP_URL",
+    "RELAY_SMTP_HOST",
+    "RELAY_SMTP_PORT",
+    "RELAY_SMTP_USER",
+    "RELAY_SMTP_PASS",
+  ].some((name) => process.env[name] !== undefined);
   const smtp = readSmtp();
-  if (smtp && from) return "smtp";
-  if (key && from) return "resend";
+  const validFrom = !from || isValidAddress(from, "sender");
+  if (smtpConfigured) return smtp && from && validFrom ? "smtp" : "off";
+  if (key && from && validFrom) return "resend";
   if (key || process.env.RELAY_REQUIRE_EMAIL === "1") return "off";
   return "file";
+}
+
+function isValidAddress(raw: string, label: string): boolean {
+  try {
+    validateMailAddress(raw, label);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Status agents should read before they try login. Missing `email` on old hubs is off. */
@@ -76,7 +95,7 @@ export function mailStatus(email: unknown = mailTransport()): MailStatus {
       login_ok: true,
       sandbox: false,
       two_person: true,
-      hint: "OTP email is live over SMTP. Ask the human for the 6-digit code. Do not invent one.",
+      hint: "OTP email is configured, delivery not verified over SMTP. Ask the human for the 6-digit code. Do not invent one.",
     };
   }
   const sandbox = isResendSandbox(fromEnv());
@@ -94,13 +113,15 @@ export function mailStatus(email: unknown = mailTransport()): MailStatus {
     login_ok: true,
     sandbox: false,
     two_person: true,
-    hint: "OTP email is live. Ask the human for the 6-digit code. Do not invent one.",
+    hint: "OTP email is configured, delivery not verified. Ask the human for the 6-digit code. Do not invent one.",
   };
 }
 
 export async function sendMail(mail: Mail): Promise<{ delivered: "resend" | "smtp" | "file" }> {
+  const to = validateMailAddress(mail.to, "recipient");
   const key = process.env.RELAY_RESEND_KEY;
   const from = fromEnv();
+  if (from) validateMailAddress(from, "sender");
   const smtp = readSmtp();
   const transport = mailTransport();
   if (transport === "off") {
@@ -116,22 +137,31 @@ export async function sendMail(mail: Mail): Promise<{ delivered: "resend" | "smt
     );
   }
   if (transport === "resend") {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${key}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ from, to: mail.to, subject: mail.subject, text: mail.text }),
-    });
-    if (!res.ok) {
-      await res.text().catch(() => "");
-      throw new RelayError(
-        502,
-        isResendSandbox(from)
-          ? "Resend sandbox rejected the mail. onboarding@resend.dev can only mail the Resend account email. Verify a domain or use SMTP. Do not invent a login code."
-          : "Resend rejected the mail. The from-address may be unverified. Do not invent a login code.",
-      );
+    const signal = AbortSignal.timeout(RESEND_TIMEOUT_MS);
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${key}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ from, to, subject: mail.subject, text: mail.text }),
+        signal,
+      });
+      if (!res.ok) {
+        throw new RelayError(
+          502,
+          isResendSandbox(from)
+            ? "Resend sandbox rejected the mail. onboarding@resend.dev can only mail the Resend account email. Verify a domain or use SMTP. Do not invent a login code."
+            : "Resend rejected the mail. The from-address may be unverified. Do not invent a login code.",
+        );
+      }
+    } catch (e) {
+      if (e instanceof RelayError) throw e;
+      if (signal.aborted) {
+        throw new RelayError(502, "Resend timed out. Check RELAY_RESEND_KEY and RELAY_FROM_EMAIL.");
+      }
+      throw new RelayError(502, "Resend could not deliver the mail. Check RELAY_RESEND_KEY and RELAY_FROM_EMAIL.");
     }
     return { delivered: "resend" };
   }
@@ -145,15 +175,18 @@ export async function sendMail(mail: Mail): Promise<{ delivered: "resend" | "smt
     return { delivered: "smtp" };
   }
   const dir = process.env.RELAY_MAILBOX_DIR ?? join(homedir(), ".agent-relay", "mailbox");
-  mkdirSync(dir, { recursive: true });
-  const safe = mail.to.replace(/[^a-z0-9._+-]/g, "_");
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  chmodSync(dir, 0o700);
+  const safe = to.replace(/[^a-z0-9._+-]/g, "_");
   const path = join(dir, `${Date.now()}-${safe}.txt`);
-  writeFileSync(path, `To: ${mail.to}\nSubject: ${mail.subject}\n\n${mail.text}\n`);
-  console.log(`[mail:file] ${mail.to} → ${path}`);
+  writeFileSync(path, `To: ${to}\nSubject: ${mail.subject}\n\n${mail.text}\n`, { mode: 0o600 });
+  chmodSync(path, 0o600);
+  console.log(`[mail:file] ${to} → ${path}`);
   return { delivered: "file" };
 }
 
 export function loginCodeMail(to: string, code: string): Mail {
+  validateMailAddress(to, "recipient");
   return {
     to,
     subject: "Your agent-relay login code",
@@ -167,6 +200,7 @@ export function loginCodeMail(to: string, code: string): Mail {
 }
 
 export function inviteMail(fromHandle: string, to: string, code: string): Mail {
+  validateMailAddress(to, "recipient");
   return {
     to,
     subject: `@${fromHandle} invited your agent to agent-relay`,
