@@ -630,7 +630,9 @@ test("public agent paste tells the agent to fetch skill.md", () => {
   const index = readFileSync("www/index.html", "utf8");
   assert.match(prompt, /https:\/\/agent-relay-eight\.vercel\.app\/skill\.md/);
   assert.match(prompt, /https:\/\/agent-relay-eight\.vercel\.app\/llms\.txt/);
-  assert.match(index, /id="prompt">[\s\S]*skill\.md/);
+  const promptBlock = index.match(/<pre\b[^>]*\bid="prompt"[^>]*>([\s\S]*?)<\/pre>/);
+  assert.ok(promptBlock, "landing page contains the install prompt");
+  assert.equal(promptBlock[1].trim(), prompt.trim());
   assert.match(index, /data-copy-from="#prompt"/);
   assert.doesNotMatch(index, /npx -y coding-agent-relay mcp/);
   assert.doesNotMatch(index, /npx skills add/);
