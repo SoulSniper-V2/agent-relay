@@ -7,17 +7,49 @@ import { dispatchMcp, type Rpc } from "./mcp-core.ts";
 import { NAME, VERSION } from "./version.ts";
 import type { Actor } from "./types.ts";
 
+const MAX_BODY_BYTES = 256_000;
+const MAX_LIMITER_KEYS = 10_000;
+
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on("data", (c: Buffer) => {
-      chunks.push(c);
-      if (chunks.reduce((n, x) => n + x.length, 0) > 256_000) {
-        reject(new RelayError(413, "Body too large."));
+    let size = 0;
+    let settled = false;
+
+    const fail = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+
+    req.on("error", fail);
+
+    const declaredLength = Number(req.headers["content-length"]);
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+      // Drain an already-connected request so the caller can still receive the
+      // 413 response without retaining any body data.
+      fail(new RelayError(413, "Body too large."));
+      req.resume();
+      return;
+    }
+
+    req.on("data", (chunk: Buffer | string) => {
+      if (settled) return;
+      const c = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      size += c.length;
+      if (size > MAX_BODY_BYTES) {
+        chunks.length = 0;
+        req.resume();
+        fail(new RelayError(413, "Body too large."));
+        return;
       }
+      chunks.push(c);
     });
-    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
-    req.on("error", reject);
+    req.on("end", () => {
+      if (settled) return;
+      settled = true;
+      resolve(Buffer.concat(chunks, size).toString("utf8"));
+    });
   });
 }
 
@@ -25,8 +57,13 @@ async function jsonBody(req: IncomingMessage): Promise<Record<string, unknown>> 
   const raw = await readBody(req);
   if (!raw.trim()) return {};
   try {
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new RelayError(400, "JSON body must be an object.");
+    }
+    return parsed as Record<string, unknown>;
+  } catch (e) {
+    if (e instanceof RelayError) throw e;
     throw new RelayError(400, "Invalid JSON body.");
   }
 }
@@ -52,30 +89,65 @@ function bearer(req: IncomingMessage): string | undefined {
   return typeof h === "string" ? h : undefined;
 }
 
+function isLoopback(address: string | undefined): boolean {
+  const normalized = address?.replace(/^::ffff:/i, "");
+  return normalized === "127.0.0.1" || normalized === "::1" || normalized === "0:0:0:0:0:0:0:1";
+}
+
 function clientIp(req: IncomingMessage): string {
-  const real = req.headers["x-real-ip"];
-  if (typeof real === "string" && real.trim()) return real.trim();
-  const xff = req.headers["x-forwarded-for"];
-  if (typeof xff === "string" && xff.trim()) {
-    const hops = xff.split(",").map((s) => s.trim()).filter(Boolean);
-    // Caddy appends the connecting client. Prefer that hop over a spoofed left-most XFF.
-    if (hops.length) return hops[hops.length - 1]!;
+  const socketAddress = req.socket.remoteAddress;
+  // Only a local reverse proxy can be trusted to have rewritten forwarding
+  // headers. Direct internet clients can otherwise rotate X-Real-IP/XFF.
+  if (isLoopback(socketAddress)) {
+    const real = req.headers["x-real-ip"];
+    if (typeof real === "string" && real.trim()) return real.trim();
+    const xff = req.headers["x-forwarded-for"];
+    if (typeof xff === "string" && xff.trim()) {
+      const hops = xff.split(",").map((s) => s.trim()).filter(Boolean);
+      // Caddy appends the connecting client. Prefer that hop over a spoofed left-most XFF.
+      if (hops.length) return hops[hops.length - 1]!;
+    }
   }
-  return req.socket.remoteAddress ?? "unknown";
+  return socketAddress ?? "unknown";
 }
 
 function makeLimiter(max: number, windowMs: number) {
   const hits = new Map<string, number[]>();
+  let calls = 0;
+
+  const prune = (now: number, keep?: string) => {
+    const cutoff = now - windowMs;
+    for (const [key, values] of hits) {
+      const recent = values.filter((value) => value > cutoff);
+      if (recent.length) hits.set(key, recent);
+      else hits.delete(key);
+    }
+
+    if (hits.size <= MAX_LIMITER_KEYS) return;
+    const oldest = [...hits.entries()]
+      .filter(([key]) => key !== keep)
+      .sort(([, a], [, b]) => (a.at(-1) ?? 0) - (b.at(-1) ?? 0));
+    for (const [key] of oldest) {
+      if (hits.size <= MAX_LIMITER_KEYS) break;
+      hits.delete(key);
+    }
+  };
+
   return (key: string) => {
     const t = Date.now();
     const next = (hits.get(key) ?? []).filter((x) => t - x < windowMs);
+    let allowed = false;
     if (next.length >= max) {
       hits.set(key, next);
-      return false;
+    } else {
+      next.push(t);
+      hits.set(key, next);
+      allowed = true;
     }
-    next.push(t);
-    hits.set(key, next);
-    return true;
+
+    calls += 1;
+    if (hits.size > MAX_LIMITER_KEYS || calls % 256 === 0) prune(t, key);
+    return allowed;
   };
 }
 
@@ -190,28 +262,38 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
           );
           return;
         }
-        const raw = await jsonBody(req);
-        const msg = raw as Rpc;
-        if (!msg || typeof msg !== "object" || Array.isArray(msg) || !msg.method) {
-          send(res, 400, { jsonrpc: "2.0", error: { code: -32600, message: "Invalid JSON-RPC" }, id: null });
-          return;
+        let raw: Record<string, unknown>;
+        try {
+          raw = await jsonBody(req);
+        } catch (e) {
+          if (e instanceof RelayError && e.status === 400) {
+            const code = e.message === "Invalid JSON body." ? -32700 : -32600;
+            send(res, 400, { jsonrpc: "2.0", error: { code, message: code === -32700 ? "Parse error." : "Invalid Request" }, id: null });
+            return;
+          }
+          throw e;
         }
-        const host = req.headers.host ?? "127.0.0.1";
-        const proto = publicUrl.startsWith("https") ? "https" : "http";
-        const hubUrl = `${proto}://${host}`;
+        const msg = raw as Rpc;
+        const hubUrl = publicUrl || HOSTED_HUB;
         const token = bearer(req)?.replace(/^Bearer\s+/i, "").trim();
         const out = await dispatchMcp(msg, {
           hubUrl,
           token,
           store,
           allowLogin: () => authIpOk(clientIp(req)),
+          allowVerify: () => verifyIpOk(clientIp(req)),
+          allowSend: (userId) => sendOk(userId),
+          allowPing: (userId) => sendOk(userId),
+          allowReply: (userId) => sendOk(userId),
+          allowHumanReply: (userId) => sendOk(userId),
+          allowInvite: (userId) => inviteOk(userId),
         });
         if (!out) {
           res.writeHead(202, { "content-type": "application/json" });
           res.end();
           return;
         }
-        send(res, 200, out);
+        send(res, out.error?.code === -32600 ? 400 : 200, out);
         return;
       }
 
@@ -369,6 +451,9 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
         const me = need();
         const messageId = p.split("/")[3];
         const b = await jsonBody(req);
+        if (b.action === "reply" && !sendOk(me.user.id)) {
+          throw new RelayError(429, "Too many messages from this agent. Try again in a few minutes.");
+        }
         send(
           res,
           200,
@@ -390,6 +475,9 @@ export function createRelayServer(store: Store, opts: { publicUrl?: string; bus?
 
       if (method === "POST" && p.match(/^\/v1\/messages\/[^/]+\/resolve$/)) {
         const me = need();
+        if (!sendOk(me.user.id)) {
+          throw new RelayError(429, "Too many messages from this agent. Try again in a few minutes.");
+        }
         const messageId = p.split("/")[3];
         const b = await jsonBody(req);
         send(res, 200, store.resolveHuman(me, messageId, { reply: b.reply != null ? String(b.reply) : undefined }));
