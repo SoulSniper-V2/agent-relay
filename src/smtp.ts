@@ -3,24 +3,53 @@ import { RelayError } from "./errors.ts";
 
 export type SmtpAuth = { host: string; port: number; user: string; pass: string };
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function bareAddr(from: string): string {
   const t = from.trim();
-  const m = t.match(/<([^>]+)>/);
-  return (m ? m[1] : t).trim();
+  const open = t.lastIndexOf("<");
+  if (open >= 0) {
+    if (!t.endsWith(">") || open === t.length - 1) return "";
+    return t.slice(open + 1, -1).trim();
+  }
+  return t;
+}
+
+/** Validate an address before it can reach an SMTP command or mail header. */
+export function validateMailAddress(raw: string, label = "email"): string {
+  if (/[\r\n]/.test(raw)) {
+    throw new RelayError(400, `${label} address must not contain CR or LF.`);
+  }
+  const address = bareAddr(raw);
+  if (address.length > 254 || /[<>]/.test(address) || !EMAIL_RE.test(address)) {
+    throw new RelayError(400, `That does not look like a valid ${label} address.`);
+  }
+  return address.toLowerCase();
+}
+
+function smtpPort(raw: string): number | null {
+  if (!/^\d+$/.test(raw)) return null;
+  const port = Number(raw);
+  return Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : null;
 }
 
 /** smtps://user:pass@host:465 or RELAY_SMTP_HOST + USER + PASS. Never log the password. */
 export function readSmtp(): SmtpAuth | null {
-  const raw = process.env.RELAY_SMTP_URL?.trim();
-  if (raw) {
+  const raw = process.env.RELAY_SMTP_URL;
+  if (raw !== undefined) {
     try {
-      const u = new URL(raw);
-      if (!u.hostname || !u.username || !u.password) return null;
+      const u = new URL(raw.trim());
+      if (u.protocol !== "smtps:" || !u.hostname || !u.username || !u.password) return null;
+      const port = smtpPort(u.port || "465");
+      if (port === null) return null;
+      const user = decodeURIComponent(u.username);
+      const pass = decodeURIComponent(u.password);
+      if (!user || !pass || /[\r\n]/.test(user) || /[\r\n]/.test(pass)) return null;
       return {
         host: u.hostname,
-        port: u.port ? Number(u.port) : 465,
-        user: decodeURIComponent(u.username),
-        pass: decodeURIComponent(u.password),
+        port,
+        user,
+        pass,
       };
     } catch {
       return null;
@@ -30,15 +59,17 @@ export function readSmtp(): SmtpAuth | null {
   const user = process.env.RELAY_SMTP_USER;
   const pass = process.env.RELAY_SMTP_PASS;
   if (!host || !user || !pass) return null;
-  return { host, port: Number(process.env.RELAY_SMTP_PORT || 465), user, pass };
+  const port = smtpPort(process.env.RELAY_SMTP_PORT?.trim() || "465");
+  if (port === null || /[\r\n]/.test(host) || /[\r\n]/.test(user) || /[\r\n]/.test(pass)) return null;
+  return { host, port, user, pass };
 }
 
 export async function sendSmtp(
   auth: SmtpAuth,
   mail: { from: string; to: string; subject: string; text: string },
 ): Promise<void> {
-  const from = bareAddr(mail.from);
-  const to = bareAddr(mail.to);
+  const from = validateMailAddress(mail.from, "sender");
+  const to = validateMailAddress(mail.to, "recipient");
   await new Promise<void>((resolve, reject) => {
     const sock = connect({ host: auth.host, port: auth.port, servername: auth.host });
     const timer = setTimeout(() => {
