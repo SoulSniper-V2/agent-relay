@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Replace the old hub on the GCE VM with this tree. Does not print secrets.
+# The remote installer stages dependencies, checkpoints SQLite after stopping
+# the writer, and rolls back the app tree if its strict health gate fails.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PROJECT="${GCE_PROJECT:-sacred-epigram-473220-s3}"
@@ -34,4 +36,4 @@ gcloud compute scp --quiet --zone="$ZONE" --project="$PROJECT" \
   "$INSTANCE:~/"
 
 gcloud compute ssh "$INSTANCE" --zone="$ZONE" --project="$PROJECT" --quiet \
-  --command='sudo mv -f ~/relay.tgz /tmp/agent-relay-new.tgz; sudo bash ~/remote-install.sh'
+  --command='sudo mv -f ~/relay.tgz /tmp/agent-relay-new.tgz && sudo bash ~/remote-install.sh'
