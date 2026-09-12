@@ -10,7 +10,7 @@ SoulSniper hosts the **hub** on a GCE VM. The **site** is static `www/` on Verce
 | Hub | GCE `instance-20250928-022120`, `us-east1-c`, e2-micro | Debian 12. Tag `agent-relay`. Also runs PiVPN — do not touch those ports. |
 | Process | systemd `agent-relay.service`, Node on `127.0.0.1:8787` | `node --experimental-sqlite --import tsx src/serve.ts` |
 | Edge | Caddy on :80/:443 | TLS for `35.211.23.64.sslip.io`. Proxies `/health` `/v1` `/mcp`. Other paths redirect to Vercel. |
-| Disk | `/var/lib/agent-relay/hub.db` | SQLite. One instance. |
+| Disk | `/var/lib/agent-relay/hub.db` | SQLite. One instance. Timestamped upgrade backups are kept under `/var/backups/agent-relay/`. |
 | Email | Resend or SMTP via `/etc/agent-relay.env` | `onboarding@resend.dev` cannot mail a second person |
 | Install | npm `coding-agent-relay` | stdio MCP or CLI for first login (agent signup). Hosted MCP: `POST /mcp` with Bearer PAT. Skill: `npx skills add SoulSniper-V2/agent-relay` |
 
@@ -44,7 +44,9 @@ Manual hub sync from this repo:
 bash deploy/sync-gce.sh
 ```
 
-That packs the hub tree, `npm ci --omit=dev`, reloads Caddy, restarts systemd, and leaves PiVPN alone.
+That packs the hub tree and uploads it to the VM. The remote installer runs `npm ci --omit=dev` in a staging tree while the current hub is still serving, then stops the writer, checkpoints SQLite WAL, verifies a timestamped database backup, and atomically swaps the app tree. It accepts the upgrade only after local `/health` returns HTTP 2xx with `ok: true` and the candidate package version. A failed start, health check, or Caddy validation restores the previous app, systemd unit, and Caddyfile and starts the previous service when it was active. It never removes `hub.db`, `hub.db-wal`, or `hub.db-shm`, and leaves PiVPN alone.
+
+The upgrade backups are local to the VM. Copy `/var/backups/agent-relay/` to a separate project or region for disaster recovery, and set a retention policy before the mailbox carries valuable history.
 
 ## Optional self-host
 

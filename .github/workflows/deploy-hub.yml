@@ -7,8 +7,14 @@ on:
       - deploy/**
       - package.json
       - package-lock.json
+      - tsconfig.json
       - .github/workflows/deploy-hub.yml
   workflow_dispatch:
+
+concurrency:
+  group: agent-relay-hub-production
+  cancel-in-progress: false
+
 jobs:
   gce:
     runs-on: ubuntu-latest
@@ -17,6 +23,13 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
