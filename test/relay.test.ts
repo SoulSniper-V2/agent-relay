@@ -87,6 +87,47 @@ test("always_escalate policy shows mail to the human without waiting", () => {
   }
 });
 
+test("room mail reaches members you are not connected to, but room memory needs every member", () => {
+  const { dir, db } = tmpDb();
+  try {
+    const store = new Store(openDb(db));
+    const alice = store.register("alice");
+    const bob = store.register("bob");
+    const carol = store.register("carol");
+    store.acceptInvite(bob.actor, store.createInvite(alice.actor).code);
+    store.acceptInvite(carol.actor, store.createInvite(alice.actor).code);
+
+    // Alice connects to both. Bob and Carol never connect to each other.
+    const room = store.createRoom(alice.actor, "shared room", ["bob", "carol"]);
+    assert.deepEqual([...room.members].sort(), ["alice", "bob", "carol"]);
+
+    // A room post reaches a member Bob cannot DM.
+    store.send(bob.actor, { room: room.slug, body: "room-only note" });
+    assert.equal(store.inbox(carol.actor, { pending: true }).some((m) => m.body.includes("room-only note")), true);
+    assert.throws(() => store.send(bob.actor, { to: "carol", body: "direct" }), /not connected/);
+
+    // Room memory needs a memory grant from every other member. Carol is not
+    // connected to Bob, so the failure names that rather than a missing grant.
+    store.setGrants(alice.actor, "bob", { level: "pair" });
+    assert.throws(
+      () => store.remember(bob.actor, `#${room.slug}`, "topic", "value"),
+      /not connected to @carol/,
+    );
+
+    // Once connected and granted, the room memory is writable.
+    store.acceptInvite(carol.actor, store.createInvite(bob.actor).code);
+    store.setGrants(carol.actor, "bob", { level: "pair" });
+    assert.equal(store.remember(bob.actor, `#${room.slug}`, "topic", "value").key, "topic");
+
+    // A non-member cannot post at all.
+    const dave = store.register("dave");
+    store.acceptInvite(dave.actor, store.createInvite(alice.actor).code);
+    assert.throws(() => store.send(dave.actor, { room: room.slug, body: "hi" }), /not in room/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("strangers cannot DM until they accept an invite", () => {
   const { dir, db } = tmpDb();
   try {
