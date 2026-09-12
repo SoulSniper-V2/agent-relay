@@ -631,6 +631,9 @@ test("public agent paste tells the agent to fetch skill.md", () => {
   assert.match(prompt, /https:\/\/agent-relay-eight\.vercel\.app\/skill\.md/);
   assert.match(prompt, /https:\/\/agent-relay-eight\.vercel\.app\/llms\.txt/);
   assert.match(index, /id="prompt">[\s\S]*skill\.md/);
+  assert.match(index, /data-copy-from="#prompt"/);
+  assert.doesNotMatch(index, /npx -y coding-agent-relay mcp/);
+  assert.doesNotMatch(index, /npx skills add/);
   const skill = readFileSync("www/skill.md", "utf8");
   const canonical = readFileSync("skills/agent-relay/SKILL.md", "utf8");
   assert.equal(skill, canonical);

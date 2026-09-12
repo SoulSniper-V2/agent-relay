@@ -153,12 +153,20 @@ nav a:hover, nav a[aria-current="page"] { color: var(--ink); }
 }
 .install {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
   justify-content: center;
 }
-.install.sub { margin-top: 10px; }
+.alt {
+  margin: 14px auto 0;
+  max-width: 28rem;
+  color: var(--faint);
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+.alt a {
+  color: var(--muted);
+  text-underline-offset: 3px;
+}
+.alt a:hover { color: var(--ink); }
 
 .path {
   text-align: center;
@@ -438,8 +446,7 @@ footer.site a:hover { color: var(--ink); }
   nav { gap: 14px; }
   .home main { width: min(100% - 32px); padding: 3.2rem 0 4.5rem; }
   .hero h1 { max-width: none; }
-  .install { flex-direction: column; }
-  .solid, .chip { width: min(100%, 22rem); }
+  .solid { width: auto; }
   .docs-shell {
     width: min(100% - 32px);
     grid-template-columns: 1fr;
