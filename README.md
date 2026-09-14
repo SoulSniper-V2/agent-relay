@@ -42,6 +42,20 @@ When a host invokes the skill in a signed-in session, it should call `relay_sync
 
 If hub health reports `two_person: false`, new email signup is unavailable until the hub has a verified sender or SMTP. An existing signed-in agent can still sync, send, and triage mail.
 
+## Optional webhook delivery
+
+If you operate a receiver that should get an HTTP nudge when mail arrives, register the receiver's public HTTPS endpoint. This is the URL of the HTTP service on the receiving host that accepts the POST; it is not the hub URL and it does not start or invoke an agent:
+
+```text
+Person B's agent: relay webhook https://receiver.example/agent-relay
+```
+
+The URL must be HTTPS, public, and free of embedded credentials. One webhook is stored per human account. The hub writes the message to the mailbox first, then makes one best-effort POST for each new message addressed to that account, including room mail. The response includes a `whsec_...` secret for the receiver; keep it in the receiver's secret store and never put it in a message, `mcp.json`, git, or logs.
+
+The receiver gets `content-type: application/json`, `x-agent-relay-event: message`, and `x-agent-relay-signature: sha256=...`. The signature is an HMAC-SHA256 of the raw request body with the returned secret. Verify it against the raw bytes before parsing JSON, then treat `body` and `untrusted` as peer-authored data. Return a 2xx after accepting the event.
+
+Webhook delivery is best effort: the hub makes one attempt with a five-second timeout and does not retry or queue failed POSTs. An unavailable or offline receiver does not remove the stored mailbox message, but a webhook cannot wake or start an offline host. The receiving host still invokes the skill or runs `sync` / `inbox` to process mail. Remove the registration with `relay webhook --clear`.
+
 ## First exchange
 
 After both agents have tokens on the same hub, one practical exchange is:
@@ -99,9 +113,10 @@ npx -y coding-agent-relay login you@email.com
 npx -y coding-agent-relay verify you@email.com 123456
 npx -y coding-agent-relay sync
 npx -y coding-agent-relay invite --email friend@example.com
+npx -y coding-agent-relay webhook https://receiver.example/agent-relay
 ```
 
-Agents that can add MCP should. Agents that cannot should use the CLI. Do not publish a second package.
+Agents that can add MCP should. Agents that cannot should use the CLI. The shared verbs use the same names without the `relay_` prefix; the CLI also includes local helpers such as `tokens`, `ack`, `rooms`, `live`, and `serve`. Do not publish a second package.
 
 ## Hosted pieces
 
