@@ -85,7 +85,7 @@ code, kbd {
   align-items: center;
   justify-content: space-between;
   min-height: 72px;
-  padding: 0 28px;
+  padding: 0 max(28px, calc((100vw - 68rem) / 2));
   border-bottom: 1px solid #252522;
   background: color-mix(in srgb, var(--bg) 90%, transparent);
   position: sticky;
@@ -154,9 +154,9 @@ nav a:hover, nav a[aria-current="page"] { color: var(--ink); }
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(22rem, 1.1fr);
+  grid-template-columns: minmax(0, 0.95fr) minmax(22rem, 1.05fr);
   align-items: center;
-  gap: clamp(2.5rem, 7vw, 7rem);
+  gap: clamp(2.5rem, 6vw, 5.5rem);
   text-align: left;
   margin: 0;
 }
@@ -166,10 +166,10 @@ nav a:hover, nav a[aria-current="page"] { color: var(--ink); }
 }
 .hero h1 {
   font-family: var(--serif);
-  font-size: clamp(3.2rem, 7.2vw, 5.8rem);
+  font-size: clamp(3.2rem, 6.6vw, 5.25rem);
   font-weight: 400;
   letter-spacing: -0.035em;
-  line-height: 0.91;
+  line-height: 0.93;
   margin: 0 0 1.4rem;
   max-width: none;
 }
@@ -189,13 +189,48 @@ nav a:hover, nav a[aria-current="page"] { color: var(--ink); }
   gap: 12px 16px;
 }
 .install-note {
-  max-width: 18rem;
+  max-width: 20rem;
   color: var(--faint);
   font-size: 12.5px;
   line-height: 1.4;
   letter-spacing: -0.01em;
 }
 .hero-prompt { min-width: 0; }
+
+.install-details {
+  margin-top: 1.15rem;
+  border-top: 1px solid var(--line);
+}
+.install-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 48px;
+  padding: 0.7rem 0;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+  list-style: none;
+}
+.install-details summary::-webkit-details-marker { display: none; }
+.install-details summary::after {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-right: 1px solid var(--muted);
+  border-bottom: 1px solid var(--muted);
+  content: "";
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform 180ms ease-out;
+}
+.install-details[open] summary::after {
+  transform: rotate(225deg) translate(-2px, -2px);
+}
+.install-details .hero-prompt { padding-top: 0.2rem; }
+.install-details .composer { border-radius: 8px; }
+.install-details .composer pre { max-height: 14rem; }
 
 .path {
   display: flex;
@@ -230,6 +265,7 @@ nav a:hover, nav a[aria-current="page"] { color: var(--ink); }
   margin: 4px 0 0;
   max-width: 48rem;
 }
+.hero-copy .hub-status { margin-top: 1rem; }
 
 .composer {
   border: 1px solid var(--line);
@@ -485,6 +521,48 @@ button.copy.is-copied,
   color: var(--ink);
   font-family: var(--serif);
   font-size: 1.1rem;
+}
+
+.hero-exchange { min-width: 0; }
+.hero .exchange-figure { border-radius: 12px; }
+.hero .exchange-caption {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  font-size: 11px;
+}
+.hero .exchange-caption span:last-child { text-align: left; }
+.hero .exchange-list::before {
+  top: 1.2rem;
+  bottom: 1.2rem;
+  left: 2.2rem;
+}
+.hero .exchange-item {
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 1.05rem 1.1rem;
+}
+.hero .exchange-content { padding-right: 0; }
+.hero .exchange-meta {
+  gap: 8px;
+  margin-bottom: 0.45rem;
+  font-size: 11px;
+}
+.hero .exchange-content > p {
+  font-family: var(--sans);
+  font-size: clamp(0.88rem, 1.2vw, 0.96rem);
+  line-height: 1.48;
+}
+.hero .exchange-content code { font-size: 0.78em; }
+.hero .human-boundary {
+  gap: 6px 10px;
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+}
+.hero .boundary-question {
+  font-family: var(--sans);
+  font-size: 0.88rem;
 }
 
 .setup-steps {
@@ -794,7 +872,7 @@ footer.site a:hover { color: var(--ink); }
   }
   .bar nav { gap: 12px; }
   .home main { width: min(100% - 32px); padding: 3.2rem 0 4.5rem; }
-  .hero h1 { font-size: clamp(3.2rem, 8vw, 5rem); }
+  .hero h1 { font-size: clamp(3.1rem, 8vw, 4.8rem); }
   .solid { width: auto; }
   .setup-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .docs-shell {
@@ -834,7 +912,7 @@ footer.site a:hover { color: var(--ink); }
   }
   .hero { gap: 2rem; }
   .hero h1 {
-    font-size: clamp(3rem, 14vw, 4.5rem);
+    font-size: clamp(3rem, 14vw, 4.3rem);
     line-height: 0.93;
     margin-bottom: 1.1rem;
   }
@@ -900,5 +978,5 @@ footer.site a:hover { color: var(--ink); }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .solid:hover, .chip:hover { transform: none; }
-  .faq summary::after { transition: none; }
+  .faq summary::after, .install-details summary::after { transition: none; }
 }

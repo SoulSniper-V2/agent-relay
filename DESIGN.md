@@ -16,9 +16,9 @@ colors:
 typography:
   display:
     fontFamily: '"Newsreader", "Iowan Old Style", Baskerville, "Times New Roman", Georgia, serif'
-    fontSize: "clamp(3.2rem, 7.2vw, 5.8rem)"
+    fontSize: "clamp(3.2rem, 6.6vw, 5.25rem)"
     fontWeight: 400
-    lineHeight: "0.91"
+    lineHeight: "0.93"
     letterSpacing: "-0.035em"
   headline:
     fontFamily: '"Newsreader", "Iowan Old Style", Baskerville, "Times New Roman", Georgia, serif'
@@ -156,7 +156,7 @@ The palette is nearblack and warm neutral, with a small parchment accent that ma
 **Character:** The pairing is editorial at the point of meaning and quiet at the point of operation. Serif headlines and exchange copy carry the human voice; sans and mono keep setup, commands, and status information precise.
 
 ### Hierarchy
-- **Display** (400, `clamp(3.2rem, 7.2vw, 5.8rem)`, `0.91` line-height): The homepage hero statement, tightly set and left aligned.
+- **Display** (400, `clamp(3.2rem, 6.6vw, 5.25rem)`, `0.93` line-height): The homepage hero statement, tightly set and left aligned.
 - **Headline** (400, `clamp(2rem, 4.2vw, 3.25rem)`, `1` line-height): Homepage section headings such as the exchange, setup, and boundary introductions.
 - **Title** (400, `clamp(2.2rem, 5vw, 3.4rem)`, `1.05` line-height): The docs page title.
 - **Body** (16px, `1.55` line-height): Functional page copy, with muted color for supporting explanations and a readable narrow measure.
@@ -168,9 +168,9 @@ The palette is nearblack and warm neutral, with a small parchment accent that ma
 
 ## Layout
 
-Both surfaces center a maximum content width of `min(68rem, calc(100% - 48px))`. The landing page uses a two-column hero with a `0.9fr / 1.1fr` split, a prompt column no narrower than `22rem`, and a responsive gap that ranges from `2.5rem` to `7rem`; it collapses to one column at `900px`. Its section rhythm uses `clamp(5rem, 10vw, 8rem)`. The setup list is four columns on wide screens, two columns at `840px`, and one column at `640px`; the boundaries split into two columns before becoming one at `640px`.
+Both surfaces center a maximum content width of `min(68rem, calc(100% - 48px))`. The landing page uses a two-column hero with a `0.95fr / 1.05fr` split, an illustrative exchange column no narrower than `22rem`, and a responsive gap that ranges from `2.5rem` to `5.5rem`; it collapses to one column at `900px`. Its section rhythm uses `clamp(5rem, 10vw, 8rem)`. The setup list is four columns on wide screens, two columns at `840px`, and one column at `640px`; the boundaries split into two columns before becoming one at `640px`.
 
-The docs page uses an `11rem` side index, a `40rem` reading column, and a `4.5rem` gap. The side index stays sticky below the `96px` header until `840px`, where it becomes a wrapping row above the article. Desktop navigation is a `72px` bar with `28px` horizontal padding; it reduces to `64px` with `16px` padding at `840px` and `12px` padding at `640px`. Mobile landing content keeps a `32px` total inline reduction and gives the hero a `2rem` gap.
+The docs page uses an `11rem` side index, a `40rem` reading column, and a `4.5rem` gap. The side index stays sticky below the `96px` header until `840px`, where it becomes a wrapping row above the article. Desktop navigation is a `72px` bar aligned to the centered content with at least `28px` horizontal padding; it reduces to `64px` with `16px` padding at `840px` and `12px` padding at `640px`. Mobile landing content keeps a `32px` total inline reduction and gives the hero a `2rem` gap.
 
 ## Elevation & Depth
 
@@ -181,7 +181,7 @@ The system is flat at rest and uses tonal layering instead of box shadows: the n
 
 ## Shapes
 
-The form language is gently rounded but still editorial and rectangular. Inline code and skip links use `4px` corners; controls and navigation CTAs use `6px`; terminal and base composer surfaces use `8px`; the homepage composer and exchange figure use `12px`. A one-pixel border carries most edges, the exchange index is circular, and composer/figure shells clip their contents. Keyboard focus uses a `2px` light outline with a `3px` offset.
+The form language is gently rounded but still editorial and rectangular. Inline code and skip links use `4px` corners; controls and navigation CTAs use `6px`; terminal and base composer surfaces use `8px`; the exchange figure uses `12px`. A one-pixel border carries most edges, the exchange index is circular, and composer/figure shells clip their contents. Keyboard focus uses a `2px` light outline with a `3px` offset.
 
 ## Components
 
@@ -199,8 +199,8 @@ Buttons feel direct and quiet, with a light primary surface and bordered utility
 
 Containers are dark reading surfaces separated by fine rules rather than floating cards.
 
-- **Prompt composer:** The homepage variant uses the deep surface, a `12px` radius, hidden overflow, an inset header strip, and a monospace prompt area capped at `min(28vh, 14rem)`.
-- **Exchange figure:** The illustrative exchange uses the deep surface, a `12px` radius, a one-pixel hairline border, a caption row, and a vertical rule connecting circular row markers.
+- **Prompt composer:** The homepage variant sits inside a native install-prompt disclosure and uses the deep surface, an `8px` radius, hidden overflow, an inset header strip, and a monospace prompt area capped at `14rem`.
+- **Exchange figure:** The hero shows the illustrative exchange beside the headline, with compact sans-serif messages and 11px metadata. It uses the deep surface, a `12px` radius, a one-pixel hairline border, a caption row, and a vertical rule connecting circular row markers.
 - **Terminal block:** Docs command panels use the deep surface, a one-pixel hairline border, an `8px` radius, `14px 16px` padding, and horizontally scrollable monospace text; wrapped variants break long content.
 
 ### Navigation
