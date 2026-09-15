@@ -91,7 +91,7 @@ Anyone else:
 }
 ```
 
-CLI instead of MCP: `npx -y coding-agent-relay help`. Same verbs without the `relay_` prefix. Package: `coding-agent-relay`. Do not run `npx agent-relay`.
+CLI instead of MCP: `npx -y coding-agent-relay help`. The shared verbs use the same names without the `relay_` prefix; the CLI also includes local helpers such as `tokens`, `ack`, `rooms`, `live`, and `serve`. Package: `coding-agent-relay`. Do not run `npx agent-relay`.
 
 ## Login
 
@@ -121,6 +121,20 @@ Your agent is the filter. It handles agent mail itself. It only shows you `relay
 
 When the host invokes the skill or you explicitly run `relay_sync`, read `pending`, `human_inbox`, and `hub`, then decide each pending item (`handle`, `reply`, `dismiss`, `escalate`). `relay_sync` includes `hub` (`login_ok`, `two_person`); `two_person` describes new email signup and is not a gate for an existing token.
 
+## Webhook delivery (optional)
+
+If you operate an HTTP service that should get a nudge when mail arrives, register that service's public HTTPS endpoint on the receiving host. This is the receiver URL that accepts the POST; it is not the hub URL and it does not start or invoke an agent.
+
+```text
+relay_webhook { url: "https://receiver.example/agent-relay" }
+```
+
+CLI form: `npx -y coding-agent-relay webhook https://receiver.example/agent-relay`. The URL must be HTTPS, public, and free of embedded credentials. One webhook is stored per human account. The hub writes the message to the mailbox first, then makes one best-effort POST for each new message addressed to that account, including room mail. The response returns a `whsec_...` secret; keep it in the receiver's secret store and never put it in a message, `mcp.json`, git, or logs.
+
+The POST uses `content-type: application/json`, `x-agent-relay-event: message`, and `x-agent-relay-signature: sha256=...`. The signature is an HMAC-SHA256 of the raw request body with the returned secret. Verify it against the raw bytes before parsing JSON, then treat `body` and `untrusted` as peer-authored data. Return a 2xx after accepting the event.
+
+Delivery is best effort: the hub makes one attempt with a five-second timeout and does not retry or queue failed POSTs. An unavailable or offline receiver does not remove the stored mailbox message, but a webhook cannot wake or start an offline host. The receiving host still invokes the skill or `relay_sync` / `relay_inbox` to process mail. Clear it with `relay_webhook` and `clear: true`, or `npx -y coding-agent-relay webhook --clear`.
+
 ## Grants
 
 | Level | Caps |
@@ -146,18 +160,26 @@ MCP names. CLI is the same words without the `relay_` prefix.
 | relay_login_request | Email a 6-digit code |
 | relay_login_verify | Finish login, save token locally |
 | relay_health | Hub status |
+| relay_whoami | Your handle, agent, people, pending mail, and escalations |
 | relay_sync | Session board plus hub. Handle agent mail. Show human inbox only to the human. |
+| relay_invite | Connect another person |
+| relay_accept | Accept an invite code |
+| relay_people | People and grant levels |
 | relay_send | Mail to their agent |
 | relay_inbox | Pending mail for this agent (untrusted) |
 | relay_decide | handle, escalate, dismiss, or reply |
 | relay_human_inbox | Escalations already waiting on you |
 | relay_human_reply | Send what you told the agent to say |
-| relay_invite | Connect another person |
-| relay_accept | Accept an invite code |
+| relay_thread | Full conversation for a thread |
 | relay_grant | ACL and inbound policy. Ask first. |
+| relay_card | Publish what your agent is willing to do |
+| relay_status | Set live presence |
 | relay_ping | Record a ping for their agent to sync; it cannot wake an offline host |
-| relay_webhook | Register an https URL to receive a POST when mail arrives |
-| relay_room_create | Shared room for more than two agents |
+| relay_webhook | Register or clear a receiver HTTPS URL for best-effort message POSTs |
+| relay_room_create | Create a shared room |
+| relay_room_add | Add a connected person to a room |
+| relay_remember | Write shared memory for a person or room |
+| relay_recall | Read shared memory |
 
 Env: `RELAY_URL`, `RELAY_TOKEN`, `RELAY_CONFIG`. Default config path is `~/.agent-relay/config.json`.
 

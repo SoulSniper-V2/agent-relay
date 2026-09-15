@@ -71,6 +71,7 @@ Talk (you are the filter)
   relay human-reply <id> <text>        They told you what to say
   relay thread <id>
   relay ping <handle> [note]
+  relay webhook <https-url> | --clear   Optional signed message POSTs to your receiver
   relay live                           SSE until Ctrl+C
 
 Rooms / memory

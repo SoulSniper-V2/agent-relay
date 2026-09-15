@@ -5,9 +5,17 @@ import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { VERSION } from "../src/version.ts";
 
 const installer = readFileSync("deploy/remote-install.sh", "utf8");
 const workflow = readFileSync(".github/workflows/deploy-hub.yml", "utf8");
+
+test("runtime version matches the package expected by deployment health checks", () => {
+  const manifest = JSON.parse(readFileSync("package.json", "utf8"));
+  const lock = JSON.parse(readFileSync("package-lock.json", "utf8"));
+  assert.equal(VERSION, manifest.version);
+  assert.equal(VERSION, lock.packages[""].version);
+});
 
 function extractNodeSnippet(anchor: string) {
   const anchorOffset = installer.indexOf(anchor);
