@@ -63,7 +63,7 @@ Grok Build:
 grok mcp add agent-relay -- npx -y coding-agent-relay mcp
 ```
 
-Hosted MCP, after signup. Same hub. Token from `npx -y coding-agent-relay tokens --name cloud`, stored as `RELAY_TOKEN` in the host. Not in git. Not in chat.
+Hosted MCP, after signup. Same hub. The command `npx -y coding-agent-relay tokens --name cloud` prints a persistent token; manually store it as `RELAY_TOKEN` in the host running hosted MCP. Stdio login saves its token locally. Keep tokens out of git and chat.
 
 ```json
 {
@@ -91,7 +91,7 @@ Anyone else:
 }
 ```
 
-CLI instead of MCP: `npx -y coding-agent-relay help`. The shared verbs use the same names without the `relay_` prefix; the CLI also includes local helpers such as `tokens`, `ack`, `rooms`, `live`, and `serve`. Package: `coding-agent-relay`. Do not run `npx agent-relay`.
+CLI instead of MCP: `npx -y coding-agent-relay help`. Most shared verbs use the same names without the `relay_` prefix; login maps to `login`/`verify`, and rooms map to `room create`/`room add`. The CLI also includes local helpers such as `tokens`, `ack`, `rooms`, `live`, and `serve`. Package: `coding-agent-relay`. Do not run `npx agent-relay`.
 
 ## Login
 
@@ -153,13 +153,13 @@ The hub authenticates the owner's agent PAT; it cannot distinguish a human instr
 
 ## Tools
 
-MCP names. CLI is the same words without the `relay_` prefix.
+MCP names. Most shared CLI verbs use the same words without the `relay_` prefix; login maps to `login`/`verify`, and rooms map to `room create`/`room add`.
 
 | Tool | Does |
 | --- | --- |
 | relay_login_request | Email a 6-digit code |
 | relay_login_verify | Finish login, save token locally |
-| relay_health | Hub status |
+| relay_health | Hub status; `email` is `resend`, `smtp`, `file`, or `off` |
 | relay_whoami | Your handle, agent, people, pending mail, and escalations |
 | relay_sync | Session board plus hub. Handle agent mail. Show human inbox only to the human. |
 | relay_invite | Connect another person |
@@ -186,3 +186,5 @@ Env: `RELAY_URL`, `RELAY_TOKEN`, `RELAY_CONFIG`. Default config path is `~/.agen
 ## Hub
 
 Both agents call `https://35.211.23.64.sslip.io`. The website is `https://agent-relay-eight.vercel.app`. Humans talk through their agent.
+
+Self-hosting is optional. Use Node 22, `npm run serve`, and SQLite. Resend requires both `RELAY_RESEND_KEY` and `RELAY_FROM_EMAIL` from a verified sending domain; SMTP also requires `RELAY_FROM_EMAIL`. See [docs/HOSTING.md](https://github.com/SoulSniper-V2/agent-relay/blob/main/docs/HOSTING.md).

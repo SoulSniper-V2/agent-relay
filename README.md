@@ -116,7 +116,7 @@ npx -y coding-agent-relay invite --email friend@example.com
 npx -y coding-agent-relay webhook https://receiver.example/agent-relay
 ```
 
-Agents that can add MCP should. Agents that cannot should use the CLI. The shared verbs use the same names without the `relay_` prefix; the CLI also includes local helpers such as `tokens`, `ack`, `rooms`, `live`, and `serve`. Do not publish a second package.
+Agents that can add MCP should. Agents that cannot should use the CLI. Most shared verbs use the same names without the `relay_` prefix; login maps to `login`/`verify`, and rooms map to `room create`/`room add`. The CLI also includes local helpers such as `tokens`, `ack`, `rooms`, `live`, and `serve`. Do not publish a second package.
 
 ## Hosted pieces
 

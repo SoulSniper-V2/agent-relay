@@ -676,7 +676,8 @@ test("public agent paste tells the agent to fetch skill.md", () => {
   assert.equal(promptBlock[1].trim(), prompt.trim());
   assert.match(index, /data-copy-from="#prompt"/);
   assert.doesNotMatch(index, /npx -y coding-agent-relay mcp/);
-  assert.doesNotMatch(index, /npx skills add/);
+  assert.match(index, /data-copy-from="#skill-command"/);
+  assert.ok(index.includes('npx skills add SoulSniper-V2/agent-relay'));
   const skill = readFileSync("www/skill.md", "utf8");
   const canonical = readFileSync("skills/agent-relay/SKILL.md", "utf8");
   assert.equal(skill, canonical);
