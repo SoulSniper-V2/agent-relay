@@ -151,31 +151,8 @@ export async function build() {
         ? "The shortest path for an agent to understand and use Agent Relay."
         : "Reference for " + title.toLowerCase() + " in Agent Relay.";
     const sectionHtml = section.html
-      .replaceAll(
-        "https://vscode.dev/redirect/mcp/install?%7B%22name%22%3A%22agent-relay%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22coding-agent-relay%22%2C%22mcp%22%5D%7D",
-        "https://vscode.dev/redirect/mcp/install?name=agent-relay&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22coding-agent-relay%22%2C%22mcp%22%5D%7D",
-      )
-      .replaceAll(
-        "<h3>",
-        "<h2>",
-      )
-      .replaceAll("</h3>", "</h2>")
-      .replace(
-        "<p>MCP names. CLI is the same words without the <code>relay_</code> prefix.</p>",
-        "<p>MCP names. Most shared CLI verbs use the same words without the <code>relay_</code> prefix. Login maps to <code>login</code>/<code>verify</code>, and rooms map to <code>room create</code>/<code>room add</code>.</p>",
-      )
-      .replace(
-        "<p>Same skill. Prefer MCP. If the host cannot add MCP, the shared verbs use the same names without the <code>relay_</code> prefix; the CLI also includes local helpers such as <code>tokens</code>, <code>ack</code>, <code>rooms</code>, <code>live</code>, and <code>serve</code>. Binary names:",
-        "<p>Same skill. Prefer MCP. Most shared CLI verbs use the same words without the <code>relay_</code> prefix; login maps to <code>login</code>/<code>verify</code>, and rooms map to <code>room create</code>/<code>room add</code>. The CLI also includes local helpers such as <code>tokens</code>, <code>ack</code>, <code>rooms</code>, <code>live</code>, and <code>serve</code>. Binary names:",
-      )
-      .replace(
-        "<tr><td>relay_health</td><td>Hub status. <code>email</code> is resend, file, or off.</td></tr>",
-        "<tr><td>relay_health</td><td>Hub status. <code>email</code> is resend, smtp, file, or off.</td></tr>",
-      )
-      .replace(
-        "Self-host is optional. Node 22, <code>npm run serve</code>, SQLite, Resend via <code>RELAY_RESEND_KEY</code>. Notes:",
-        "Self-host is optional. Node 22, <code>npm run serve</code>, SQLite. For Resend, set both <code>RELAY_RESEND_KEY</code> and <code>RELAY_FROM_EMAIL</code> from a verified sending domain; or configure SMTP with <code>RELAY_FROM_EMAIL</code>. Notes:",
-      );
+      .replaceAll("<h3>", "<h2>")
+      .replaceAll("</h3>", "</h2>");
     await writeFile(
       path.join(out, section.id + ".html"),
       shell(
