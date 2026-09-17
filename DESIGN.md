@@ -2,228 +2,92 @@
 name: Agent Relay
 description: Mailbox so your coding agent talks to someone else's.
 colors:
-  nearblack: "#090908"
-  surface: "#11110f"
-  surface-inset: "#0d0d0c"
-  warm-white: "#f4f3ef"
-  muted: "#a09f97"
-  faint: "#85847b"
-  hairline: "#2b2b27"
-  hairline-strong: "#3b3b37"
-  paper: "#f4f3ef"
-  paper-ink: "#0a0a09"
-  warm-accent: "#d4b184"
+  canvas: "#f7f8fb"
+  surface: "#ffffff"
+  ink: "#202635"
+  muted: "#5c6373"
+  hairline: "#dde2eb"
+  cobalt: "#2355db"
+  cobalt-soft: "#edf2ff"
+  warning: "#71531c"
+  warning-surface: "#fff8e8"
+  dark-canvas: "#11151e"
+  dark-surface: "#181e2a"
+  dark-ink: "#edf1fa"
+  dark-muted: "#aab4c6"
+  dark-hairline: "#303b4d"
+  dark-cobalt: "#8cabff"
+  dark-cobalt-soft: "#202f50"
 typography:
-  display:
-    fontFamily: '"Newsreader", "Iowan Old Style", Baskerville, "Times New Roman", Georgia, serif'
-    fontSize: "clamp(3.2rem, 6.6vw, 5.25rem)"
-    fontWeight: 400
-    lineHeight: "0.93"
-    letterSpacing: "-0.035em"
-  headline:
-    fontFamily: '"Newsreader", "Iowan Old Style", Baskerville, "Times New Roman", Georgia, serif'
-    fontSize: "clamp(2rem, 4.2vw, 3.25rem)"
-    fontWeight: 400
-    lineHeight: "1"
-    letterSpacing: "-0.03em"
-  title:
-    fontFamily: '"Newsreader", "Iowan Old Style", Baskerville, "Times New Roman", Georgia, serif'
-    fontSize: "clamp(2.2rem, 5vw, 3.4rem)"
-    fontWeight: 400
-    lineHeight: "1.05"
-    letterSpacing: "-0.03em"
-  body:
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-    fontSize: "16px"
-    lineHeight: "1.55"
-  label:
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace"
-    fontSize: "11px"
-    fontWeight: 600
-    lineHeight: "1"
-    letterSpacing: "0.07em"
-  mono:
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace"
-    fontSize: "12.5px"
-    lineHeight: "1.65"
-  button:
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-    fontSize: "13px"
-    fontWeight: 500
-    lineHeight: "1"
-  button-small:
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-    fontSize: "12px"
-    fontWeight: 500
-    lineHeight: "1"
-  nav-cta:
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-    fontSize: "13px"
-    fontWeight: 500
-    lineHeight: "1"
-rounded:
-  sm: "4px"
-  md: "6px"
-  lg: "8px"
-  xl: "12px"
-  circle: "50%"
-spacing:
-  sm: "8px"
-  md: "12px"
-  lg: "16px"
-  xl: "28px"
-  section: "clamp(5rem, 10vw, 8rem)"
-components:
-  button-primary:
-    backgroundColor: "{colors.paper}"
-    textColor: "{colors.paper-ink}"
-    typography: "{typography.button}"
-    rounded: "{rounded.md}"
-    padding: "0 22px"
-    height: "48px"
-  button-copy:
-    backgroundColor: "transparent"
-    textColor: "{colors.warm-white}"
-    typography: "{typography.button-small}"
-    rounded: "{rounded.md}"
-    padding: "0 10px"
-    height: "32px"
-  nav-cta:
-    backgroundColor: "transparent"
-    textColor: "{colors.warm-white}"
-    typography: "{typography.nav-cta}"
-    rounded: "{rounded.md}"
-    padding: "0 14px"
-    height: "44px"
-  prompt-composer:
-    backgroundColor: "{colors.surface}"
-    rounded: "{rounded.xl}"
-  terminal-block:
-    backgroundColor: "{colors.surface}"
-    typography: "{typography.mono}"
-    rounded: "{rounded.lg}"
-    padding: "14px 16px"
-  exchange-figure:
-    backgroundColor: "{colors.surface}"
-    rounded: "{rounded.xl}"
+  family: Manrope
+  source: www/fonts/manrope-latin-variable.woff2
+  weight: "400 800"
+  body: "16px / 1.65"
+  code: '"SFMono-Regular", Consolas, "Liberation Mono", monospace'
+layout:
+  landing-content: "min(1180px, calc(100% - 64px))"
+  docs-content: "min(1240px, calc(100% - 64px))"
+  mobile-content: "calc(100% - 40px)"
 ---
 
 # Design System: Agent Relay
 
-## Overview
+## Direction
 
-**Creative North Star: "The Editorial Handoff"**
+**Creative north star: The Cobalt Courier.** The public surfaces are a light-first utility interface for a quiet agent-to-agent handoff. An off-white canvas, white reading surfaces, cobalt actions, readable dark ink, and one-pixel rules establish hierarchy without visual noise. Both landing and docs share the same Manrope family, top bar, controls, and theme toggle.
 
-Agent Relay's current public surfaces use a warm nearblack editorial landing for a product whose work moves between agents and reaches a person only at a decision boundary. Newsreader gives the landing its measured, human voice; the sans stack carries functional copy and controls; monospace marks prompts, commands, code, and compact metadata.
-
-The homepage keeps one primary action in view: copy the prompt. Thin rules, dark tonal layers, and open spacing lead into an illustrative exchange, four setup steps, and a boundary FAQ. The docs page changes to Read mode while retaining the same bar, palette, type pairing, and restrained surfaces; its sticky on-this-page index, narrow reading column, and terminal blocks support scanning and comprehension.
-
-**Key Characteristics:**
-- Warm nearblack canvas with layered panels and hairline separators.
-- Newsreader for editorial hierarchy, system sans for functional prose, and monospace for prompts and code.
-- One primary `Copy prompt` action on the landing page.
-- Warm accent reserved for exchange metadata and the human escalation boundary.
-- Documentation presented as a focused Read mode with a sticky section index.
+Light mode is the default. The header toggle switches `data-theme="dark"` and persists the choice as `relay-theme` in local storage. Dark mode swaps the same roles to a navy canvas and lighter cobalt; it does not introduce a second visual language.
 
 ## Colors
 
-The palette is nearblack and warm neutral, with a small parchment accent that marks the human edge of an exchange.
+The source of truth is the custom property set in `www/site.css`.
 
-### Primary
-- **Warm Parchment Accent**: Used sparingly for exchange labels and actions, the human-row tint, the active exchange marker, and the `Person decides` boundary.
+| Role | Light | Dark |
+| --- | --- | --- |
+| Canvas | `#f7f8fb` | `#11151e` |
+| Surface | `#fff` | `#181e2a` |
+| Ink | `#202635` | `#edf1fa` |
+| Muted copy | `#5c6373` | `#aab4c6` |
+| Hairline | `#dde2eb` | `#303b4d` |
+| Cobalt action/link | `#2355db` | `#8cabff` |
+| Cobalt wash | `#edf2ff` | `#202f50` |
+| Hub warning text/surface | `#71531c` / `#fff8e8` | `#efd092` / `#292418` |
 
-### Neutral
-- **Warm Nearblack**: The page canvas and the dark foundation of both public surfaces.
-- **Deep Surface**: The primary panel color for the prompt composer, exchange figure, terminal blocks, and client links.
-- **Inset Surface**: The darker header strip inside composers and the inline-code background.
-- **Warm White**: Main text, active navigation, speaker names, and the light primary action.
-- **Muted Gray**: Supporting copy, inactive navigation, and documentation prose.
-- **Faint Gray**: Secondary notes, captions, markers, and table headings.
-- **Hairline Gray**: One-pixel separators around sections, rows, tables, and containers.
-- **Strong Hairline Gray**: Higher-contrast borders, controls, timeline lines, and focus-adjacent edges.
-- **Paper Light**: The light control surface used by the primary action and copied states.
-- **Paper Ink**: Dark text on light controls.
-
-### Named Rules
-**The Warm Boundary Rule.** Keep the warm accent rare: use it to orient the exchange and mark the human escalation boundary while the rest of the interface stays neutral.
+Cobalt carries links, primary actions, active documentation navigation, focus outlines, step numbers, and the small brand mark. The warning pair is reserved for the hosted signup status message. The page is flat at rest: surfaces use tonal contrast and hairlines rather than shadows.
 
 ## Typography
 
-**Display Font:** Newsreader (with Iowan Old Style, Baskerville, Times New Roman, and Georgia fallbacks)
-**Body Font:** The system sans stack (with Segoe UI, Roboto, Helvetica Neue, and Arial fallbacks)
-**Label/Mono Font:** The system monospace stack (with SFMono-Regular, Menlo, and Monaco fallbacks)
+`www/fonts/manrope-latin-variable.woff2` is loaded locally with `@font-face`, `font-display: swap`, and weights `400 800`. Manrope is the only display, body, navigation, label, and button family. Headings use weight `650`, a `1.15` line height, and tight negative tracking; `h1` is `clamp(44px, 5.9vw, 76px)`, `h2` is `clamp(30px, 3.2vw, 44px)`, and `h3` is `21px`. Body copy is `16px / 1.65`.
 
-**Character:** The pairing is editorial at the point of meaning and quiet at the point of operation. Serif headlines and exchange copy carry the human voice; sans and mono keep setup, commands, and status information precise.
+Commands, prompts, inline code, and terminal panels use the local system monospace stack: `SFMono-Regular`, Consolas, or Liberation Mono. Monospace is a functional texture, not a competing display voice.
 
-### Hierarchy
-- **Display** (400, `clamp(3.2rem, 6.6vw, 5.25rem)`, `0.93` line-height): The homepage hero statement, tightly set and left aligned.
-- **Headline** (400, `clamp(2rem, 4.2vw, 3.25rem)`, `1` line-height): Homepage section headings such as the exchange, setup, and boundary introductions.
-- **Title** (400, `clamp(2.2rem, 5vw, 3.4rem)`, `1.05` line-height): The docs page title.
-- **Body** (16px, `1.55` line-height): Functional page copy, with muted color for supporting explanations and a readable narrow measure.
-- **Label** (600, 11px, `0.07em` tracking, uppercase): Exchange metadata and boundary labels; small indices use the same monospace family with slightly wider tracking.
-- **Mono** (12.5px, `1.65` line-height): Prompt text, terminal blocks, inline code, and technical identifiers.
+## Shared frame and interaction
 
-### Named Rules
-**The Two Voice Rule.** Let Newsreader lead statements and illustrative exchange copy; use sans for functional prose and controls, and mono for prompts, code, and compact metadata.
+The desktop content gutter is `64px` inside a maximum width of `1180px`; mobile content is `calc(100% - 40px)`. The shared `.bar` is an `80px` high bottom-ruled header with a two-square Agent Relay mark, Docs and GitHub links, a theme toggle, and a Get started link. At `720px` it becomes `68px` high with `20px` inline padding and hides the nav CTA.
 
-## Layout
+Controls are compact and rectangular: solid cobalt buttons have a `7px` radius and a `50px` minimum height; copy controls have a `6px` radius, one-pixel border, and a `44px` minimum height. Copied states use the cobalt wash. Interactive elements share a `2px` cobalt focus outline with a `5px` offset. Keep transitions restrained and honor `prefers-reduced-motion`.
 
-Both surfaces center a maximum content width of `min(68rem, calc(100% - 48px))`. The landing page uses a two-column hero with a `0.95fr / 1.05fr` split, an illustrative exchange column no narrower than `22rem`, and a responsive gap that ranges from `2.5rem` to `5.5rem`; it collapses to one column at `900px`. Its section rhythm uses `clamp(5rem, 10vw, 8rem)`. The setup list is four columns on wide screens, two columns at `840px`, and one column at `640px`; the boundaries split into two columns before becoming one at `640px`.
+## Landing page
 
-The docs page uses an `11rem` side index, a `40rem` reading column, and a `4.5rem` gap. The side index stays sticky below the `96px` header until `840px`, where it becomes a wrapping row above the article. Desktop navigation is a `72px` bar aligned to the centered content with at least `28px` horizontal padding; it reduces to `64px` with `16px` padding at `840px` and `12px` padding at `640px`. Mobile landing content keeps a `32px` total inline reduction and gives the hero a `2rem` gap.
+The hero in `www/index.html` is a two-column grid (`1.07fr 1fr`) with a `32px` gap, centered vertically inside a `570px` minimum-height region. The left column carries the statement, lede, and action row. The right column carries `www/assets/courier.png`, the generated `1254 × 1254` RGBA illustration of two cobalt mailboxes passing an envelope on a silver track. The image fills its column and is capped at `550px` on very wide screens.
 
-## Elevation & Depth
+The hero keeps two equally visible entry actions: the solid `Copy agent prompt` button and the bordered `Copy skill command` button. The `#get-started` section repeats the two paths as a skill command line and a native prompt `<details>` disclosure. The workflow is a three-column numbered list on wide screens, followed by a two-column boundary/FAQ section and a closing CTA. All sections are separated by one-pixel rules; they are content-led rather than card-led.
 
-The system is flat at rest and uses tonal layering instead of box shadows: the nearblack canvas, deep surfaces, and inset strips separate regions, while one-pixel rules define structure. The sticky bar adds a translucent nearblack mix with `backdrop-filter: blur(10px)`; no box-shadow vocabulary is present in the current CSS.
+## Responsive landing rules
 
-### Named Rules
-**The Flat-By-Default Rule.** Use dark tonal layers and hairline structure for depth; keep surfaces shadowless and let state changes come from borders, color, or the small control lift already present in the implementation.
+At `980px`, the hero remains two columns but tightens its gap and vertical padding; the install grid and section gaps contract. At `720px`, the shared container uses `40px` total inline reduction, the hero becomes one column with the courier below the actions, and the two hero actions become full-width stacked controls. Installation becomes one column, workflow steps stack with the number in a narrow leading column, boundaries become one column, and closing/footer content stacks. The FAQ keeps native disclosure rows at every width.
 
-## Shapes
+## Documentation
 
-The form language is gently rounded but still editorial and rectangular. Inline code and skip links use `4px` corners; controls and navigation CTAs use `6px`; terminal and base composer surfaces use `8px`; the exchange figure uses `12px`. A one-pixel border carries most edges, the exchange index is circular, and composer/figure shells clip their contents. Keyboard focus uses a `2px` light outline with a `3px` offset.
+`www/docs.css` gives the docs a three-column reading layout inside `min(1240px, calc(100% - 64px))`: a `220px` sticky documentation rail, a `minmax(0, 680px)` article, and a `150px` sticky on-this-page outline, separated by a `64px` gap. The rail groups topics and contains the desktop topic search; the article uses a readable `680px` measure, ruled section headings, cobalt links, callouts, quick-step rows, and flat bordered terminal blocks; the outline tracks page anchors.
 
-## Components
+At `1050px`, the outline is hidden and the rail/article grid contracts to `200px` plus `680px` with a `42px` gap. At `720px`, the layout becomes one column, the desktop rail is hidden, and a `Browse documentation` `<details>` disclosure appears above the article. Docs actions stack, headings and terminal blocks reduce, next-page cards become one column, and the footer uses the same mobile gutter.
 
-### Buttons
+The current topic search is client-side: `www/ui.js` filters links marked `data-doc-topic` and shows `No matching topics.` when needed. There is a visible `/` key hint beside the desktop field; pressing `/` focuses it when the page is not already in a form control. The mobile disclosure duplicates the grouped links without a search field, so search is currently desktop-only; keep this limitation explicit until the markup changes.
 
-Buttons feel direct and quiet, with a light primary surface and bordered utility controls.
+## Do's and don'ts
 
-- **Shape:** `6px` corners.
-- **Primary:** The `Copy prompt` action uses the light paper surface with dark paper ink, a `48px` minimum height, `0 22px` horizontal padding, 13px medium sans text, and a one-pixel upward hover lift with a slight brightness increase.
-- **Copy / ghost:** Documentation copy controls are transparent with a strong hairline border, `32px` minimum height, `0 10px` padding, and 12px medium sans text; hover raises the border contrast.
-- **Copied state:** Primary, copy, and chip controls switch to the light paper surface with paper ink.
-- **Focus:** All controls use the shared light `2px` focus outline with `3px` offset.
-
-### Cards / Containers
-
-Containers are dark reading surfaces separated by fine rules rather than floating cards.
-
-- **Prompt composer:** The homepage variant sits inside a native install-prompt disclosure and uses the deep surface, an `8px` radius, hidden overflow, an inset header strip, and a monospace prompt area capped at `14rem`.
-- **Exchange figure:** The hero shows the illustrative exchange beside the headline, with compact sans-serif messages and 11px metadata. It uses the deep surface, a `12px` radius, a one-pixel hairline border, a caption row, and a vertical rule connecting circular row markers.
-- **Terminal block:** Docs command panels use the deep surface, a one-pixel hairline border, an `8px` radius, `14px 16px` padding, and horizontally scrollable monospace text; wrapped variants break long content.
-
-### Navigation
-
-The shared top bar is a sticky, translucent nearblack strip with a bottom rule and a small two-square Agent Relay mark. Links are muted at rest, become warm white on hover or on the current docs page, and keep a `44px` minimum target. The `Get started` CTA is a bordered `6px` control that inverts to the light paper surface on hover. The docs side index is a quiet vertical list that becomes a wrapping row on compact screens.
-
-### Signature Patterns
-
-- **Illustrative exchange:** Three rows show an ask, an answer, and an escalation. Uppercase metadata sits above Newsreader message copy; the human row gets a restrained accent tint, accent marker, and a `Person decides` rule with the question beneath it.
-- **Setup steps:** Four numbered items use an open grid and a short top marker; each index is warm-accent monospace, with a sans title and muted explanatory copy. The grid becomes a stacked list on mobile.
-- **Boundary FAQ:** Native `details` rows use a `56px` minimum summary target, one-pixel dividers, and a small chevron that rotates on open; answer copy stays muted and indented by the chevron measure.
-
-## Do's and Don'ts
-
-### Do:
-- **Do** keep the nearblack canvas, layered dark surfaces, warm white text, and hairline structure as the base visual language.
-- **Do** preserve the Newsreader / sans / monospace role split and its hierarchy.
-- **Do** make one primary `Copy prompt` action legible on the landing page.
-- **Do** use the warm accent to explain exchange state and human escalation, with restraint.
-- **Do** keep documentation in Read mode: a narrow article, sticky section index, and calm terminal panels.
-
-### Don't:
-- **Don't** turn the public surfaces into a dashboard, live-chat window, or monitoring console; the current product presents a handoff and a reading surface.
-- **Don't** spread the warm accent across ordinary body copy, large backgrounds, or every control.
-- **Don't** collapse the serif, sans, and mono roles into one generic type treatment.
-- **Don't** replace hairline separators and tonal layers with heavy shadows or decorative surface effects.
+- Keep the off-white/cobalt light-first system, local Manrope font, real courier asset, flat surfaces, and hairline structure.
+- Keep prompt and skill installation actions paired and obvious on the landing page.
+- Preserve the docs rail/article/outline hierarchy and the mobile browse disclosure.
+- Do not reintroduce the old serif display treatment, dark-only foundation, decorative shadows, or dashboard-style card grids.

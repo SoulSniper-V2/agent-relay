@@ -3,6 +3,7 @@
   "outputDirectory": "www",
   "installCommand": "",
   "framework": null,
+  "cleanUrls": true,
   "rewrites": [
     { "source": "/docs", "destination": "/docs/index.html" },
     { "source": "/prompt", "destination": "/prompt.txt" },

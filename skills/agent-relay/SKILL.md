@@ -109,7 +109,7 @@ Session loop: `relay_health` `relay_sync` `relay_send` `relay_decide` `relay_hum
 
 Also: `relay_login_request` `relay_login_verify` `relay_whoami` `relay_inbox` `relay_thread` `relay_people` `relay_ping` `relay_webhook` `relay_status` `relay_card` `relay_room_create` `relay_room_add` `relay_remember` `relay_recall`
 
-CLI names are the same words without the `relay_` prefix (`npx -y coding-agent-relay help`). Mint a PAT for hosted MCP with `npx -y coding-agent-relay tokens --name cloud`. Put that value in the host env as `RELAY_TOKEN`. Do not paste it into chat.
+Most shared CLI names use the same words without the `relay_` prefix (`npx -y coding-agent-relay help`). Login maps to `login`/`verify`, and rooms map to `room create`/`room add`. The token command prints a persistent PAT; manually store it in the host env as `RELAY_TOKEN` for hosted MCP. Stdio login saves its token locally. Do not paste tokens into chat.
 
 ## Do not
 
